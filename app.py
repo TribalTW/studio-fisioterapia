@@ -72,7 +72,7 @@ st.markdown(
 )
 
 
-# Inizializzazione Database SQLite con aggiornamento automatico sicuro delle colonne
+# Inizializzazione Database SQLite con supporto IP e Ban
 def init_db():
   conn = sqlite3.connect("prenotazioni.db")
   c = conn.cursor()
@@ -87,11 +87,10 @@ def init_db():
             ip TEXT
         )
     """)
-  # Aggiunge la colonna ip se la tabella esisteva già ma ne era sprovvista
   try:
     c.execute("ALTER TABLE prenotazioni ADD COLUMN ip TEXT")
   except sqlite3.OperationalError:
-    pass  # La colonna esiste già, proseguiamo
+    pass
 
   c.execute("""
         CREATE TABLE IF NOT EXISTS banned_ips (
@@ -163,7 +162,7 @@ if st.session_state["admin_logged_in"]:
 
 # --- VISTA 1: PANNELLO AMMINISTRATORE ---
 if st.session_state["admin_logged_in"]:
-  st.title("📊 Gestione Appuntamenti & Sicurezza (Admin)")
+  st.title("📊 Gestione Appuntamenti & Studio (Admin)")
 
   conn = sqlite3.connect("prenotazioni.db")
   df = pd.read_sql_query(
@@ -178,12 +177,133 @@ if st.session_state["admin_logged_in"]:
   else:
     st.info("Nessuna prenotazione presente nel database.")
 
-  # SEZIONE GESTIONE BAN / CANCELLAZIONE PUNTUALE
+  # 1. SEZIONE UNIFICATA BLOCCO / SBLOCCO STUDIO
   st.markdown("---")
-  st.subheader("🚫 Gestione Spam e Sicurezza IP")
+  st.subheader("🔒🔓 Gestione Chiusure e Sblocchi Studio")
+  st.write(
+      "Seleziona un giorno o un intervallo, scegli l'orario (o l'intera"
+      " giornata) e clicca sul pulsante corrispondente."
+  )
 
-  col_ban1, col_ban2 = st.columns(2)
-  with col_ban1:
+  col_bs1, col_bs2 = st.columns(2)
+  with col_bs1:
+    data_intervallo = st.date_input(
+        "Data o Intervallo di Date",
+        value=(datetime.today(), datetime.today()),
+        min_value=datetime.today(),
+        key="data_intervallo_input",
+    )
+  with col_bs2:
+    modo_intervallo = st.radio(
+        "Ambito",
+        ["Tutta la giornata", "Orario specifico"],
+        key="modo_intervallo_input",
+    )
+
+  ora_intervallo = None
+  TUTTI_GLI_ORARI_ADMIN = [
+      "08:00",
+      "09:00",
+      "10:00",
+      "11:00",
+      "15:00",
+      "16:00",
+      "17:00",
+      "18:00",
+      "19:00",
+  ]
+  if modo_intervallo == "Orario specifico":
+    ora_intervallo = st.selectbox(
+        "Seleziona Orario", TUTTI_GLI_ORARI_ADMIN, key="ora_intervallo_input"
+    )
+
+  col_btn1, col_btn2 = st.columns(2)
+  with col_btn1:
+    btn_blocca = st.button("🔒 Blocca Selezionati", type="primary")
+  with col_btn2:
+    btn_sblocca = st.button("🔓 Sblocca Selezionati")
+
+  # Logica comune di estrazione date per Blocco/Sblocco
+  if btn_blocca or btn_sblocca:
+    if isinstance(data_intervallo, tuple):
+      if len(data_intervallo) == 2:
+        lista_date = pd.date_range(
+            start=data_intervallo[0], end=data_intervallo[1]
+        ).strftime("%Y-%m-%d")
+      elif len(data_intervallo) == 1:
+        lista_date = [str(data_intervallo[0])]
+      else:
+        lista_date = []
+    else:
+      lista_date = [str(data_intervallo)]
+
+    conn = sqlite3.connect("prenotazioni.db")
+    c = conn.cursor()
+
+    if btn_blocca:
+      for d_str in lista_date:
+        if modo_intervallo == "Tutta la giornata":
+          for h in TUTTI_GLI_ORARI_ADMIN:
+            c.execute(
+                "SELECT id FROM prenotazioni WHERE data = ? AND ora = ?",
+                (d_str, h),
+            )
+            if not c.fetchone():
+              c.execute(
+                  "INSERT INTO prenotazioni (nome, data, ora, trattamento,"
+                  " data_creazione, ip) VALUES (?, ?, ?, ?, ?, ?)",
+                  (
+                      "🔒 STUDIO CHIUSO",
+                      d_str,
+                      h,
+                      "Chiusura Admin",
+                      datetime.now().strftime("%Y-%m-%d %H:%M"),
+                      "SYSTEM",
+                  ),
+              )
+        else:
+          c.execute(
+              "SELECT id FROM prenotazioni WHERE data = ? AND ora = ?",
+              (d_str, ora_intervallo),
+          )
+          if not c.fetchone():
+            c.execute(
+                "INSERT INTO prenotazioni (nome, data, ora, trattamento,"
+                " data_creazione, ip) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    "🔒 ORARIO CHIUSO",
+                    d_str,
+                    ora_intervallo,
+                    "Chiusura Admin",
+                    datetime.now().strftime("%Y-%m-%d %H:%M"),
+                    "SYSTEM",
+                ),
+            )
+      st.success("Blocco applicato con successo per le date selezionate!")
+
+    elif btn_sblocca:
+      for d_str in lista_date:
+        if modo_intervallo == "Tutta la giornata":
+          c.execute("DELETE FROM prenotazioni WHERE data = ?", (d_str,))
+        else:
+          if ora_intervallo:
+            c.execute(
+                "DELETE FROM prenotazioni WHERE data = ? AND ora = ?",
+                (d_str, ora_intervallo),
+            )
+      st.success("Sblocco applicato con successo per le date selezionate!")
+
+    conn.commit()
+    conn.close()
+    st.rerun()
+
+  # 2. SEZIONE IN FONDO: ELIMINAZIONE SINGOLA, BAN IP E BLACKLIST CON NOMI
+  st.markdown("---")
+  st.subheader("🛡️ Gestione Spam, Sicurezza e Blacklist")
+
+  col_sec1, col_sec2 = st.columns(2)
+  with col_sec1:
+    st.markdown("##### Elimina Prenotazione Singola")
     id_da_eliminare = st.number_input(
         "ID Prenotazione da eliminare",
         min_value=0,
@@ -202,9 +322,10 @@ if st.session_state["admin_logged_in"]:
         )
         st.rerun()
 
-  with col_ban2:
+  with col_sec2:
+    st.markdown("##### Ban Indirizzo IP")
     ip_da_bannare = st.text_input(
-        "Indirizzo IP da bannare", key="ip_ban_input"
+        "Inserisci Indirizzo IP da bannare", key="ip_ban_input"
     )
     if st.button("Banna Indirizzo IP"):
       if ip_da_bannare.strip():
@@ -216,215 +337,47 @@ if st.session_state["admin_logged_in"]:
               (ip_da_bannare.strip(),),
           )
           conn.commit()
-          st.success(f"L'IP {ip_da_bannare} è stato inserito nella blacklist.")
+          st.success(
+              f"L'IP {ip_da_bannare} è stato inserito nella blacklist."
+          )
         except Exception as e:
           st.error(f"Errore: {e}")
         finally:
           conn.close()
         st.rerun()
 
-  # Mostra lista IP bannati
+  # Tabella Blacklist con collegamento ai nominativi usati
+  st.markdown("##### 📋 Blacklist IP & Nominativi Associati")
   conn = sqlite3.connect("prenotazioni.db")
-  df_banned = pd.read_sql_query("SELECT * FROM banned_ips", conn)
+  df_banned = pd.read_sql_query(
+      """
+        SELECT b.ip, 
+               COALESCE(GROUP_CONCAT(DISTINCT p.nome), 'Nessun nome registrato') AS nominativi_utilizzati
+        FROM banned_ips b
+        LEFT JOIN prenotazioni p ON b.ip = p.ip
+        GROUP BY b.ip
+    """,
+      conn,
+  )
   conn.close()
+
   if not df_banned.empty:
-    with st.expander("Visualizza IP attualmente bannati"):
-      st.dataframe(df_banned, use_container_width=True)
-      ip_da_sbannare = st.selectbox(
-          "Seleziona IP da rimuovere dal ban",
-          df_banned["ip"].tolist(),
-          key="sbianca_ip",
-      )
-      if st.button("Rimuovi Ban IP"):
-        conn = sqlite3.connect("prenotazioni.db")
-        c = conn.cursor()
-        c.execute("DELETE FROM banned_ips WHERE ip = ?", (ip_da_sbannare,))
-        conn.commit()
-        conn.close()
-        st.success(f"IP {ip_da_sbannare} sbannato con successo!")
-        st.rerun()
-
-  st.markdown("---")
-  st.subheader("🔒 Gestione Chiusure / Blocchi Studio (anche a intervallo)")
-  st.write(
-      "Seleziona un giorno o un intervallo di date per bloccare l'intera"
-      " giornata o un orario specifico."
-  )
-
-  col_b1, col_b2 = st.columns(2)
-  with col_b1:
-    data_blocco = st.date_input(
-        "Data o Intervallo da gestire",
-        value=(datetime.today(), datetime.today()),
-        min_value=datetime.today(),
-        key="data_blocco_input",
+    st.dataframe(df_banned, use_container_width=True)
+    ip_da_sbannare = st.selectbox(
+        "Seleziona IP da rimuovere dalla blacklist",
+        df_banned["ip"].tolist(),
+        key="sbianca_ip",
     )
-  with col_b2:
-    tipo_blocco = st.radio(
-        "Tipo di blocco",
-        ["Tutta la giornata", "Orario specifico"],
-        key="tipo_blocco_input",
-    )
-
-  ora_blocco = None
-  TUTTI_GLI_ORARI_ADMIN = [
-      "08:00",
-      "09:00",
-      "10:00",
-      "11:00",
-      "15:00",
-      "16:00",
-      "17:00",
-      "18:00",
-      "19:00",
-  ]
-  if tipo_blocco == "Orario specifico":
-    ora_blocco = st.selectbox(
-        "Seleziona Orario da bloccare",
-        TUTTI_GLI_ORARI_ADMIN,
-        key="ora_blocco_input",
-    )
-
-  if st.button("Conferma Blocco Studio"):
-    conn = sqlite3.connect("prenotazioni.db")
-    c = conn.cursor()
-
-    if isinstance(data_blocco, tuple):
-      if len(data_blocco) == 2:
-        lista_date = pd.date_range(
-            start=data_blocco[0], end=data_blocco[1]
-        ).strftime("%Y-%m-%d")
-      elif len(data_blocco) == 1:
-        lista_date = [str(data_blocco[0])]
-      else:
-        lista_date = []
-    else:
-      lista_date = [str(data_blocco)]
-
-    for d_str in lista_date:
-      if tipo_blocco == "Tutta la giornata":
-        for h in TUTTI_GLI_ORARI_ADMIN:
-          c.execute(
-              "SELECT id FROM prenotazioni WHERE data = ? AND ora = ?",
-              (d_str, h),
-          )
-          if not c.fetchone():
-            c.execute(
-                "INSERT INTO prenotazioni (nome, data, ora, trattamento,"
-                " data_creazione, ip) VALUES (?, ?, ?, ?, ?, ?)",
-                (
-                    "🔒 STUDIO CHIUSO",
-                    d_str,
-                    h,
-                    "Chiusura Admin",
-                    datetime.now().strftime("%Y-%m-%d %H:%M"),
-                    "SYSTEM",
-                ),
-            )
-      else:
-        c.execute(
-            "SELECT id FROM prenotazioni WHERE data = ? AND ora = ?",
-            (d_str, ora_blocco),
-        )
-        if not c.fetchone():
-          c.execute(
-              "INSERT INTO prenotazioni (nome, data, ora, trattamento,"
-              " data_creazione, ip) VALUES (?, ?, ?, ?, ?, ?)",
-              (
-                  "🔒 ORARIO CHIUSO",
-                  d_str,
-                  ora_blocco,
-                  "Chiusura Admin",
-                  datetime.now().strftime("%Y-%m-%d %H:%M"),
-                  "SYSTEM",
-              ),
-          )
-
-    conn.commit()
-    conn.close()
-    st.success("Blocco applicato con successo per le date selezionate!")
-    st.rerun()
-
-  # SEZIONE SBLOCCO SPECULARE CON INTERVALLO
-  st.markdown("---")
-  st.subheader("🔓 Gestione Sblocchi Studio (anche a intervallo)")
-  st.write(
-      "Seleziona un giorno o un intervallo di date da sbloccare in un solo"
-      " colpo."
-  )
-
-  col_s1, col_s2 = st.columns(2)
-  with col_s1:
-    data_sblocco = st.date_input(
-        "Data o Intervallo da sbloccare",
-        value=(datetime.today(), datetime.today()),
-        min_value=datetime.today(),
-        key="data_sblocco_input",
-    )
-  with col_s2:
-    tipo_sblocco = st.radio(
-        "Tipo di sblocco",
-        ["Tutta la giornata", "Orario specifico"],
-        key="tipo_sblocco_input",
-    )
-
-  ora_sblocco = None
-  if tipo_sblocco == "Orario specifico":
-    conn = sqlite3.connect("prenotazioni.db")
-    c = conn.cursor()
-    data_rif = (
-        data_sblocco[0]
-        if isinstance(data_sblocco, tuple)
-        else str(data_sblocco)
-    )
-    c.execute(
-        "SELECT DISTINCT ora FROM prenotazioni WHERE data = ?", (str(data_rif),)
-    )
-    slot_occupati = c.fetchall()
-    conn.close()
-
-    orari_occupati_data = [row[0] for row in slot_occupati]
-    if orari_occupati_data:
-      ora_sblocco = st.selectbox(
-          "Seleziona Orario da sbloccare",
-          orari_occupati_data,
-          key="ora_sblocco_input",
-      )
-    else:
-      st.info(
-          "Nessun orario occupato o bloccato trovato per la data di riferimento."
-      )
-
-  if st.button("Conferma Sblocco Studio"):
-    conn = sqlite3.connect("prenotazioni.db")
-    c = conn.cursor()
-
-    if isinstance(data_sblocco, tuple):
-      if len(data_sblocco) == 2:
-        lista_date_sblocco = pd.date_range(
-            start=data_sblocco[0], end=data_sblocco[1]
-        ).strftime("%Y-%m-%d")
-      elif len(data_sblocco) == 1:
-        lista_date_sblocco = [str(data_sblocco[0])]
-      else:
-        lista_date_sblocco = []
-    else:
-      lista_date_sblocco = [str(data_sblocco)]
-
-    for d_str in lista_date_sblocco:
-      if tipo_sblocco == "Tutta la giornata":
-        c.execute("DELETE FROM prenotazioni WHERE data = ?", (d_str,))
-      else:
-        if ora_sblocco:
-          c.execute(
-              "DELETE FROM prenotazioni WHERE data = ? AND ora = ?",
-              (d_str, ora_sblocco),
-          )
-
-    conn.commit()
-    conn.close()
-    st.success("Sblocco applicato con successo per le date selezionate!")
-    st.rerun()
+    if st.button("Rimuovi Ban (Sbanna IP)"):
+      conn = sqlite3.connect("prenotazioni.db")
+      c = conn.cursor()
+      c.execute("DELETE FROM banned_ips WHERE ip = ?", (ip_da_sbannare,))
+      conn.commit()
+      conn.close()
+      st.success(f"IP {ip_da_sbannare} rimosso dalla blacklist con successo!")
+      st.rerun()
+  else:
+    st.info("Nessun IP presente nella blacklist.")
 
 
 # --- VISTA 2: PAGINA PRINCIPALE CLIENTE ---
