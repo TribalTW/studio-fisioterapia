@@ -179,6 +179,11 @@ else:
   with tab1:
     st.markdown("### Modulo di Prenotazione")
 
+    # MOSTRA IL MESSAGGIO DI CONFERMA SE LA PRENOTAZIONE È ANDATA A BUON FINE
+    if "booking_success_msg" in st.session_state:
+      st.success(st.session_state["booking_success_msg"])
+      del st.session_state["booking_success_msg"]
+
     # 1. Seleziona la data PRIMA del modulo per calcolare gli orari liberi
     data_scelta = st.date_input(
         "Seleziona Data desiderata *", min_value=datetime.today()
@@ -216,7 +221,8 @@ else:
           " prenotati. Per favore seleziona un'altra data!"
       )
     else:
-      with st.form("booking_form"):
+      # clear_on_submit=True SVUOTA AUTOMATICAMENTE IL FORM DOPO L'INVIO!
+      with st.form("booking_form", clear_on_submit=True):
         nome = st.text_input("Nome e Cognome *")
         trattamento = st.selectbox(
             "Seleziona Trattamento / Lezione *",
@@ -267,9 +273,11 @@ else:
               )
               conn.commit()
               conn.close()
-              st.success(
-                  f"✨ Prenotazione confermata per {nome} il {data_scelta} alle"
-                  f" {ora_scelta}!"
+
+              # Salva il messaggio per farlo apparire verde in alto dopo il refresh
+              st.session_state["booking_success_msg"] = (
+                  f"🎉 PRENOTAZIONE CONFERMATA!\n\nGrazie {nome}, ti aspettiamo"
+                  f" il {data_scelta} alle ore {ora_scelta} per {trattamento}."
               )
               st.rerun()
 
