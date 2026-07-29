@@ -11,7 +11,7 @@ st.set_page_config(
     layout="centered",
 )
 
-# Stile CSS con forzatura mirata dello sfondo del riquadro rosa e campi bianchi
+# Stile CSS con pulsanti secondari in verde chiaro e riquadro rosa
 st.markdown(
     """
     <style>
@@ -35,8 +35,8 @@ st.markdown(
         border: 1px solid #E0E0E0 !important;
     }
     
-    /* Pulsante di conferma rosa magenta */
-    div.stButton > button {
+    /* Pulsante principale di conferma (Rosa Magenta) */
+    div.stButton > button[kind="primary"] {
         background-color: #D81B60 !important;
         color: white !important;
         border-radius: 10px !important;
@@ -47,9 +47,25 @@ st.markdown(
         padding: 12px 20px !important;
         margin-top: 10px !important;
     }
-    
-    div.stButton > button:hover {
+    div.stButton > button[kind="primary"]:hover {
         background-color: #C2185B !important;
+    }
+
+    /* Pulsanti secondari (Sblocca, Sbanna, Elimina, ecc. in Verde Chiaro) */
+    div.stButton > button:not([kind="primary"]) {
+        background-color: #C8E6C9 !important;
+        color: #2E7D32 !important;
+        border-radius: 10px !important;
+        font-size: 1rem !important;
+        font-weight: bold !important;
+        border: 1px solid #A5D6A7 !important;
+        width: 100% !important;
+        padding: 10px 20px !important;
+        margin-top: 5px !important;
+    }
+    div.stButton > button:not([kind="primary"]):hover {
+        background-color: #A5D6A7 !important;
+        color: #1B5E20 !important;
     }
     
     /* Titoli in rosa scuro */
@@ -469,9 +485,21 @@ else:
             "18:00",
             "19:00",
         ]
-        orari_disponibili = [
-            h for h in TUTTI_GLI_ORARI if h not in orari_occupati
-        ]
+
+        # Filtra gli orari escludendo quelli passati se la data scelta è oggi
+        current_datetime = datetime.now()
+        current_date = current_datetime.date()
+        current_time = current_datetime.time()
+
+        orari_disponibili = []
+        for h in TUTTI_GLI_ORARI:
+          if h in orari_occupati:
+            continue
+          if data_scelta == current_date:
+            slot_time = datetime.strptime(h, "%H:%M").time()
+            if slot_time <= current_time:
+              continue  # Salta gli orari già trascorsi nella giornata odierna
+          orari_disponibili.append(h)
 
         with col2:
           if orari_disponibili:
@@ -487,7 +515,9 @@ else:
             )
             ora_scelta = None
 
-        submitted = st.button("Conferma Prenotazione", type="primary")
+        submitted = st.button(
+            "Conferma Prenotazione", type="primary"
+        )  # Pulsante principale Rosa
 
       # Logica di salvataggio con salvataggio IP
       if submitted:
@@ -495,7 +525,8 @@ else:
           st.error("Per favore inserisci il tuo nome e cognome.")
         elif not ora_scelta or ora_scelta == "Tutto occupato":
           st.error(
-              "Spiacenti, tutti gli orari per questa data sono già occupati."
+              "Spiacenti, tutti gli orari per questa data sono già occupati o"
+              " passati."
           )
         else:
           conn = sqlite3.connect("prenotazioni.db")
