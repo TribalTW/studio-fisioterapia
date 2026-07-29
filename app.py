@@ -11,7 +11,7 @@ st.set_page_config(
     layout="centered",
 )
 
-# Personalizzazione Stile CSS Avanzata
+# Personalizzazione Stile CSS
 st.markdown(
     """
     <style>
@@ -23,7 +23,7 @@ st.markdown(
         border: 1px solid #F8BBD0;
     }
     
-    /* Campi di testo e selezioni */
+    /* Campi di testo, selezioni e selettore data con sfondo bianco */
     .stTextInput input, .stSelectbox > div > div, .stDateInput input {
         background-color: #FFFFFF !important;
         border-radius: 8px !important;
@@ -179,107 +179,107 @@ else:
   with tab1:
     st.markdown("### Modulo di Prenotazione")
 
-    # MOSTRA IL MESSAGGIO DI CONFERMA SE LA PRENOTAZIONE È ANDATA A BUON FINE
+    # Messaggio di conferma in verde se presente
     if "booking_success_msg" in st.session_state:
       st.success(st.session_state["booking_success_msg"])
       del st.session_state["booking_success_msg"]
 
-    # 1. Seleziona la data PRIMA del modulo per calcolare gli orari liberi
-    data_scelta = st.date_input(
-        "Seleziona Data desiderata *", min_value=datetime.today()
-    )
-
-    # Controlla quali orari sono GIA' prenotati per questa data nel Database
-    conn = sqlite3.connect("prenotazioni.db")
-    c = conn.cursor()
-    c.execute(
-        "SELECT ora FROM prenotazioni WHERE data = ?", (str(data_scelta),)
-    )
-    orari_occupati = [row[0] for row in c.fetchall()]
-    conn.close()
-
-    # Tutti gli orari di lavoro possibili dello studio
-    TUTTI_GLI_ORARI = [
-        "08:00",
-        "09:00",
-        "10:00",
-        "11:00",
-        "15:00",
-        "16:00",
-        "17:00",
-        "18:00",
-        "19:00",
-    ]
-
-    # Mostra SOLO gli orari non ancora occupati
-    orari_disponibili = [h for h in TUTTI_GLI_ORARI if h not in orari_occupati]
-
-    # Se la giornata è piena, blocca le prenotazioni per quel giorno
-    if not orari_disponibili:
-      st.warning(
-          "⚠️ Spiacenti, tutti gli orari per questa data sono già stati"
-          " prenotati. Per favore seleziona un'altra data!"
+    # TUTTO DENTRO IL QUADRATO ROSA
+    with st.form("booking_form", clear_on_submit=True):
+      nome = st.text_input("Nome e Cognome *")
+      trattamento = st.selectbox(
+          "Seleziona Trattamento / Lezione *",
+          [
+              "Valutazione Posturale",
+              "Lezione Pilates Individuale",
+              "Pilates Duetto (in coppia)",
+              "Rieducazione Posturale Motorìa",
+          ],
       )
-    else:
-      # clear_on_submit=True SVUOTA AUTOMATICAMENTE IL FORM DOPO L'INVIO!
-      with st.form("booking_form", clear_on_submit=True):
-        nome = st.text_input("Nome e Cognome *")
-        trattamento = st.selectbox(
-            "Seleziona Trattamento / Lezione *",
-            [
-                "Valutazione Posturale",
-                "Lezione Pilates Individuale",
-                "Pilates Duetto (in coppia)",
-                "Rieducazione Posturale Motorìa",
-            ],
+
+      # DATA ED ORA AFFIANCATE IN DUE COLONNE DENTRO IL FORM
+      col1, col2 = st.columns(2)
+
+      with col1:
+        data_scelta = st.date_input(
+            "Seleziona Data *", min_value=datetime.today()
         )
 
-        ora_scelta = st.selectbox(
-            "Seleziona Ora Disponibile *", orari_disponibili
-        )
+      # Calcolo orari già occupati per la data selezionata
+      conn = sqlite3.connect("prenotazioni.db")
+      c = conn.cursor()
+      c.execute(
+          "SELECT ora FROM prenotazioni WHERE data = ?", (str(data_scelta),)
+      )
+      orari_occupati = [row[0] for row in c.fetchall()]
+      conn.close()
 
-        submitted = st.form_submit_button("Conferma Prenotazione")
+      TUTTI_GLI_ORARI = [
+          "08:00",
+          "09:00",
+          "10:00",
+          "11:00",
+          "15:00",
+          "16:00",
+          "17:00",
+          "18:00",
+          "19:00",
+      ]
+      orari_disponibili = [
+          h for h in TUTTI_GLI_ORARI if h not in orari_occupati
+      ]
 
-        if submitted:
-          if nome.strip() == "":
-            st.error("Per favore inserisci il tuo nome e cognome.")
-          else:
-            # Controllo di sicurezza finale prima di inserire
-            conn = sqlite3.connect("prenotazioni.db")
-            c = conn.cursor()
-            c.execute(
-                "SELECT id FROM prenotazioni WHERE data = ? AND ora = ?",
-                (str(data_scelta), ora_scelta),
+      with col2:
+        if orari_disponibili:
+          ora_scelta = st.selectbox("Seleziona Ora *", orari_disponibili)
+        else:
+          ora_scelta = st.selectbox(
+              "Seleziona Ora *", ["Nessun orario disponibile"]
+          )
+
+      submitted = st.form_submit_button("Conferma Prenotazione")
+
+      if submitted:
+        if nome.strip() == "":
+          st.error("Per favore inserisci il tuo nome e cognome.")
+        elif ora_scelta == "Nessun orario disponibile":
+          st.error("Spiacenti, tutti gli orari per questa data sono occupati.")
+        else:
+          # Controllo sicurezza sovrapposizione
+          conn = sqlite3.connect("prenotazioni.db")
+          c = conn.cursor()
+          c.execute(
+              "SELECT id FROM prenotazioni WHERE data = ? AND ora = ?",
+              (str(data_scelta), ora_scelta),
+          )
+          gia_prenotato = c.fetchone()
+
+          if gia_prenotato:
+            st.error(
+                "⚠️ Spiacenti, questo orario è stato appena occupato! Riprova"
+                " con un altro orario."
             )
-            gia_prenotato = c.fetchone()
+            conn.close()
+          else:
+            c.execute(
+                "INSERT INTO prenotazioni (nome, data, ora, trattamento,"
+                " data_creazione) VALUES (?, ?, ?, ?, ?)",
+                (
+                    nome,
+                    str(data_scelta),
+                    ora_scelta,
+                    trattamento,
+                    datetime.now().strftime("%Y-%m-%d %H:%M"),
+                ),
+            )
+            conn.commit()
+            conn.close()
 
-            if gia_prenotato:
-              st.error(
-                  "⚠️ Spiacenti, questo orario è stato appena occupato!"
-                  " Riprova con un altro orario."
-              )
-              conn.close()
-            else:
-              c.execute(
-                  "INSERT INTO prenotazioni (nome, data, ora, trattamento,"
-                  " data_creazione) VALUES (?, ?, ?, ?, ?)",
-                  (
-                      nome,
-                      str(data_scelta),
-                      ora_scelta,
-                      trattamento,
-                      datetime.now().strftime("%Y-%m-%d %H:%M"),
-                  ),
-              )
-              conn.commit()
-              conn.close()
-
-              # Salva il messaggio per farlo apparire verde in alto dopo il refresh
-              st.session_state["booking_success_msg"] = (
-                  f"🎉 PRENOTAZIONE CONFERMATA!\n\nGrazie {nome}, ti aspettiamo"
-                  f" il {data_scelta} alle ore {ora_scelta} per {trattamento}."
-              )
-              st.rerun()
+            st.session_state["booking_success_msg"] = (
+                f"🎉 PRENOTAZIONE CONFERMATA!\n\nGrazie {nome}, ti aspettiamo il"
+                f" {data_scelta} alle ore {ora_scelta} per {trattamento}."
+            )
+            st.rerun()
 
   # TAB 2: INFO STUDIO
   with tab2:
