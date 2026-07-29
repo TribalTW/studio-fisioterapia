@@ -11,7 +11,7 @@ st.set_page_config(
     layout="centered",
 )
 
-# Personalizzazione Stile CSS Avanzata
+# Personalizzazione Stile CSS
 st.markdown(
     """
     <style>
@@ -23,7 +23,7 @@ st.markdown(
         border: 1px solid #F8BBD0;
     }
     
-    /* Campi di testo e selezioni */
+    /* Campi di testo, selezioni e selettore data con sfondo bianco */
     .stTextInput input, .stSelectbox > div > div, .stDateInput input {
         background-color: #FFFFFF !important;
         border-radius: 8px !important;
@@ -61,7 +61,7 @@ st.markdown(
 )
 
 
-# Inizializzazione Database
+# Inizializzazione Database SQLite
 def init_db():
   conn = sqlite3.connect("prenotazioni.db")
   c = conn.cursor()
@@ -82,7 +82,6 @@ def init_db():
 init_db()
 
 # --- BARRA LATERALE (Logo & Admin) ---
-# Ricerca automatica del file logo senza far bloccare l'app
 logo_path = None
 for possible_name in [
     "logo.png",
@@ -104,35 +103,67 @@ else:
 st.sidebar.markdown("---")
 st.sidebar.title("🔐 Area Riservata (Admin)")
 
-# Password Admin (Modificala pure se desideri)
 ADMIN_PASSWORD = "MiaPassword2026!"
 
-admin_pass = st.sidebar.text_input(
-    "Password Admin", type="password", key="admin_pwd"
-)
+# Gestione dello stato di Login Admin
+if "admin_logged_in" not in st.session_state:
+  st.session_state["admin_logged_in"] = False
 
-if admin_pass == ADMIN_PASSWORD:
-  st.sidebar.success("Accesso eseguito!")
+if not st.session_state["admin_logged_in"]:
+  admin_pass = st.sidebar.text_input(
+      "Password Admin", type="password", key="admin_pwd_input"
+  )
+  if admin_pass == ADMIN_PASSWORD:
+    st.session_state["admin_logged_in"] = True
+    st.rerun()
+  elif admin_pass != "":
+    st.sidebar.error("Password errata!")
+
+# Pulsante di Logout se l'admin è collegato
+if st.session_state["admin_logged_in"]:
+  st.sidebar.success("Accesso Admin attivo")
+  if st.sidebar.button("🚪 Esci dall'Area Admin"):
+    st.session_state["admin_logged_in"] = False
+    st.rerun()
+
+
+# --- VISTA 1: PANNELLO AMMINISTRATORE ---
+if st.session_state["admin_logged_in"]:
   st.title("📊 Gestione Appuntamenti (Admin)")
 
   conn = sqlite3.connect("prenotazioni.db")
   df = pd.read_sql_query(
       "SELECT id, nome, data, ora, trattamento, data_creazione FROM"
-      " prenotazioni ORDER BY data DESC",
+      " prenotazioni ORDER BY data DESC, ora ASC",
       conn,
   )
   conn.close()
 
   if not df.empty:
     st.dataframe(df, use_container_width=True)
+
+    st.markdown("---")
+    st.subheader("🗑️ Elimina / Annulla Prenotazione")
+    id_da_eliminare = st.number_input(
+        "Inserisci l'ID della prenotazione da cancellare:", min_value=1, step=1
+    )
+    if st.button("Elimina Prenotazione"):
+      conn = sqlite3.connect("prenotazioni.db")
+      c = conn.cursor()
+      c.execute("DELETE FROM prenotazioni WHERE id = ?", (id_da_eliminare,))
+      conn.commit()
+      conn.close()
+      st.success(
+          f"Prenotazione ID {id_da_eliminare} eliminata! L'orario è di nuovo"
+          " libero."
+      )
+      st.rerun()
   else:
     st.info("Nessuna prenotazione presente nel database.")
 
-else:
-  if admin_pass != "":
-    st.sidebar.error("Password errata!")
 
-  # --- PAGINA PRINCIPALE CLIENTE ---
+# --- VISTA 2: PAGINA PRINCIPALE CLIENTE ---
+else:
   st.title("Postura & Pilates")
   st.subheader("Dott.ssa Roberta Sinagra")
 
@@ -144,71 +175,110 @@ else:
       "📜 Regolamento",
   ])
 
-  # TAB 1: PRENOTAZIONE
+  # TAB 1: PRENOTAZIONE DINAMICA
   with tab1:
     st.markdown("### Modulo di Prenotazione")
-    with st.form("booking_form"):
-      nome = st.text_input("Nome e Cognome *")
-      trattamento = st.selectbox(
-          "Seleziona Trattamento / Lezione",
-          [
-              "Valutazione Posturale",
-              "Lezione Pilates Individuale",
-              "Pilates Duetto (in coppia)",
-              "Rieducazione Posturale Motorìa",
-          ],
-      )
 
-      col1, col2 = st.columns(2)
-      with col1:
-        data = st.date_input("Seleziona Data", min_value=datetime.today())
-      with col2:
-        ora = st.selectbox(
-            "Seleziona Ora",
+    # 1. Seleziona la data PRIMA del modulo per calcolare gli orari liberi
+    data_scelta = st.date_input(
+        "Seleziona Data desiderata *", min_value=datetime.today()
+    )
+
+    # Controlla quali orari sono GIA' prenotati per questa data nel Database
+    conn = sqlite3.connect("prenotazioni.db")
+    c = conn.cursor()
+    c.execute(
+        "SELECT ora FROM prenotazioni WHERE data = ?", (str(data_scelta),)
+    )
+    orari_occupati = [row[0] for row in c.fetchall()]
+    conn.close()
+
+    # Tutti gli orari di lavoro possibili dello studio
+    TUTTI_GLI_ORARI = [
+        "08:00",
+        "09:00",
+        "10:00",
+        "11:00",
+        "15:00",
+        "16:00",
+        "17:00",
+        "18:00",
+        "19:00",
+    ]
+
+    # Mostra SOLO gli orari non ancora occupati
+    orari_disponibili = [h for h in TUTTI_GLI_ORARI if h not in orari_occupati]
+
+    # Se la giornata è piena, blocca le prenotazioni per quel giorno
+    if not orari_disponibili:
+      st.warning(
+          "⚠️ Spiacenti, tutti gli orari per questa data sono già stati"
+          " prenotati. Per favore seleziona un'altra data!"
+      )
+    else:
+      with st.form("booking_form"):
+        nome = st.text_input("Nome e Cognome *")
+        trattamento = st.selectbox(
+            "Seleziona Trattamento / Lezione *",
             [
-                "08:00",
-                "09:00",
-                "10:00",
-                "11:00",
-                "15:00",
-                "16:00",
-                "17:00",
-                "18:00",
-                "19:00",
+                "Valutazione Posturale",
+                "Lezione Pilates Individuale",
+                "Pilates Duetto (in coppia)",
+                "Rieducazione Posturale Motorìa",
             ],
         )
 
-      submitted = st.form_submit_button("Conferma Prenotazione")
+        ora_scelta = st.selectbox(
+            "Seleziona Ora Disponibile *", orari_disponibili
+        )
 
-      if submitted:
-        if nome.strip() == "":
-          st.error("Per favore inserisci il tuo nome e cognome.")
-        else:
-          conn = sqlite3.connect("prenotazioni.db")
-          c = conn.cursor()
-          c.execute(
-              "INSERT INTO prenotazioni (nome, data, ora, trattamento,"
-              " data_creazione) VALUES (?, ?, ?, ?, ?)",
-              (
-                  nome,
-                  str(data),
-                  ora,
-                  trattamento,
-                  datetime.now().strftime("%Y-%m-%d %H:%M"),
-              ),
-          )
-          conn.commit()
-          conn.close()
-          st.success(
-              f"✨ Prenotazione confermata per {nome} il {data} alle {ora}!"
-          )
+        submitted = st.form_submit_button("Conferma Prenotazione")
+
+        if submitted:
+          if nome.strip() == "":
+            st.error("Per favore inserisci il tuo nome e cognome.")
+          else:
+            # Controllo di sicurezza finale prima di inserire
+            conn = sqlite3.connect("prenotazioni.db")
+            c = conn.cursor()
+            c.execute(
+                "SELECT id FROM prenotazioni WHERE data = ? AND ora = ?",
+                (str(data_scelta), ora_scelta),
+            )
+            gia_prenotato = c.fetchone()
+
+            if gia_prenotato:
+              st.error(
+                  "⚠️ Spiacenti, questo orario è stato appena occupato!"
+                  " Riprova con un altro orario."
+              )
+              conn.close()
+            else:
+              c.execute(
+                  "INSERT INTO prenotazioni (nome, data, ora, trattamento,"
+                  " data_creazione) VALUES (?, ?, ?, ?, ?)",
+                  (
+                      nome,
+                      str(data_scelta),
+                      ora_scelta,
+                      trattamento,
+                      datetime.now().strftime("%Y-%m-%d %H:%M"),
+                  ),
+              )
+              conn.commit()
+              conn.close()
+              st.success(
+                  f"✨ Prenotazione confermata per {nome} il {data_scelta} alle"
+                  f" {ora_scelta}!"
+              )
+              st.rerun()
 
   # TAB 2: INFO STUDIO
   with tab2:
     st.markdown("### ℹ️ Informazioni sullo Studio")
     st.write(
-        "Benvenuti nello studio della **Dott.ssa Roberta Sinagra**, specializzato"
-        " in Posturologia e Pilates."
+        "Benvenuti nello studio della **Dott.ssa Roberta Sinagra**,"
+        " specializzato in Posturologia e Pilates."
     )
     st.write(
         "I nostri percorsi individuali e di coppia sono pensati per migliorare"
