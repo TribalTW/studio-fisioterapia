@@ -11,7 +11,7 @@ st.set_page_config(
     layout="centered",
 )
 
-# Personalizzazione Stile CSS
+# Personalizzazione Stile CSS Avanzata
 st.markdown(
     """
     <style>
@@ -23,7 +23,7 @@ st.markdown(
         border: 1px solid #F8BBD0;
     }
     
-    /* Campi di testo, selezioni e selettore data con sfondo bianco */
+    /* Campi di testo e selezioni */
     .stTextInput input, .stSelectbox > div > div, .stDateInput input {
         background-color: #FFFFFF !important;
         border-radius: 8px !important;
