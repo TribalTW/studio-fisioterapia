@@ -15,15 +15,22 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    /* Sfondo rosa per il riquadro di prenotazione */
-    div[data-testid="stContainer"] {
+    /* Contenitore Rosa Personalizzato */
+    .pink-box {
         background-color: #FCE4EC !important;
         padding: 25px !important;
         border-radius: 16px !important;
         border: 1px solid #F8BBD0 !important;
+        margin-bottom: 20px !important;
     }
     
-    /* Campi di testo, selezioni e selettore data con sfondo bianco */
+    /* Forza gli elementi dentro il box rosa ad avere il massimo contrasto */
+    .pink-box label {
+        color: #880E4F !important;
+        font-weight: 600 !important;
+    }
+
+    /* Campi di testo, selezioni e selettore data con sfondo bianco lucido */
     .stTextInput input, .stSelectbox > div > div, .stDateInput input {
         background-color: #FFFFFF !important;
         border-radius: 8px !important;
@@ -194,109 +201,109 @@ else:
       st.success(st.session_state["booking_success_msg"])
       del st.session_state["booking_success_msg"]
 
-    # RIQUADRO ROSA
-    with st.container(border=True):
-      nome = st.text_input("Nome e Cognome *")
-      trattamento = st.selectbox(
-          "Seleziona Trattamento / Lezione *",
-          [
-              "Valutazione Posturale",
-              "Lezione Pilates Individuale",
-              "Pilates Duetto (in coppia)",
-              "Rieducazione Posturale Motorìa",
-          ],
+    # APERTURA BOX ROSA (HTML + CSS)
+    st.markdown('<div class="pink-box">', unsafe_allow_html=True)
+
+    nome = st.text_input("Nome e Cognome *")
+    trattamento = st.selectbox(
+        "Seleziona Trattamento / Lezione *",
+        [
+            "Valutazione Posturale",
+            "Lezione Pilates Individuale",
+            "Pilates Duetto (in coppia)",
+            "Rieducazione Posturale Motorìa",
+        ],
+    )
+
+    # DATA ED ORA AFFIANCATE IN DUE COLONNE DENTRO IL BOX ROSA
+    col1, col2 = st.columns(2)
+
+    with col1:
+      data_scelta = st.date_input(
+          "Seleziona Data *", min_value=datetime.today()
       )
 
-      # DATA ED ORA AFFIANCATE IN DUE COLONNE DENTRO IL BOX ROSA
-      col1, col2 = st.columns(2)
+    # Calcolo orari già occupati per la data selezionata
+    conn = sqlite3.connect("prenotazioni.db")
+    c = conn.cursor()
+    c.execute(
+        "SELECT ora FROM prenotazioni WHERE data = ?", (str(data_scelta),)
+    )
+    orari_occupati = [row[0] for row in c.fetchall()]
+    conn.close()
 
-      with col1:
-        data_scelta = st.date_input(
-            "Seleziona Data *", min_value=datetime.today()
+    TUTTI_GLI_ORARI = [
+        "08:00",
+        "09:00",
+        "10:00",
+        "11:00",
+        "15:00",
+        "16:00",
+        "17:00",
+        "18:00",
+        "19:00",
+    ]
+    orari_disponibili = [h for h in TUTTI_GLI_ORARI if h not in orari_occupati]
+
+    with col2:
+      if orari_disponibili:
+        ora_scelta = st.selectbox("Seleziona Ora *", orari_disponibili)
+      else:
+        st.selectbox(
+            "Seleziona Ora *", ["Tutto occupato"], disabled=True, key="dis_ora"
         )
+        ora_scelta = None
 
-      # Calcolo orari già occupati per la data selezionata
-      conn = sqlite3.connect("prenotazioni.db")
-      c = conn.cursor()
-      c.execute(
-          "SELECT ora FROM prenotazioni WHERE data = ?", (str(data_scelta),)
-      )
-      orari_occupati = [row[0] for row in c.fetchall()]
-      conn.close()
+    submitted = st.button("Conferma Prenotazione", type="primary")
 
-      TUTTI_GLI_ORARI = [
-          "08:00",
-          "09:00",
-          "10:00",
-          "11:00",
-          "15:00",
-          "16:00",
-          "17:00",
-          "18:00",
-          "19:00",
-      ]
-      orari_disponibili = [
-          h for h in TUTTI_GLI_ORARI if h not in orari_occupati
-      ]
+    # CHIUSURA BOX ROSA
+    st.markdown("</div>", unsafe_allow_html=True)
 
-      with col2:
-        if orari_disponibili:
-          ora_scelta = st.selectbox("Seleziona Ora *", orari_disponibili)
-        else:
-          st.selectbox(
-              "Seleziona Ora *", ["Tutto occupato"], disabled=True, key="dis_ora"
-          )
-          ora_scelta = None
+    if submitted:
+      if not nome.strip():
+        st.error("Per favore inserisci il tuo nome e cognome.")
+      elif not ora_scelta or ora_scelta == "Tutto occupato":
+        st.error("Spiacenti, tutti gli orari per questa data sono già occupati.")
+      else:
+        # Controllo sicurezza finale sovrapposizione
+        conn = sqlite3.connect("prenotazioni.db")
+        c = conn.cursor()
+        c.execute(
+            "SELECT id FROM prenotazioni WHERE data = ? AND ora = ?",
+            (str(data_scelta), ora_scelta),
+        )
+        gia_prenotato = c.fetchone()
 
-      submitted = st.button("Conferma Prenotazione", type="primary")
-
-      if submitted:
-        if not nome.strip():
-          st.error("Per favore inserisci il tuo nome e cognome.")
-        elif not ora_scelta or ora_scelta == "Tutto occupato":
+        if gia_prenotato:
           st.error(
-              "Spiacenti, tutti gli orari per questa data sono già occupati."
+              "⚠️ Spiacenti, questo orario è stato appena occupato! Riprova con"
+              " un altro orario."
           )
+          conn.close()
         else:
-          # Controllo sicurezza finale sovrapposizione
-          conn = sqlite3.connect("prenotazioni.db")
-          c = conn.cursor()
           c.execute(
-              "SELECT id FROM prenotazioni WHERE data = ? AND ora = ?",
-              (str(data_scelta), ora_scelta),
+              "INSERT INTO prenotazioni (nome, data, ora, trattamento,"
+              " data_creazione) VALUES (?, ?, ?, ?, ?)",
+              (
+                  nome,
+                  str(data_scelta),
+                  ora_scelta,
+                  trattamento,
+                  datetime.now().strftime("%Y-%m-%d %H:%M"),
+              ),
           )
-          gia_prenotato = c.fetchone()
+          conn.commit()
+          conn.close()
 
-          if gia_prenotato:
-            st.error(
-                "⚠️ Spiacenti, questo orario è stato appena occupato! Riprova"
-                " con un altro orario."
-            )
-            conn.close()
-          else:
-            c.execute(
-                "INSERT INTO prenotazioni (nome, data, ora, trattamento,"
-                " data_creazione) VALUES (?, ?, ?, ?, ?)",
-                (
-                    nome,
-                    str(data_scelta),
-                    ora_scelta,
-                    trattamento,
-                    datetime.now().strftime("%Y-%m-%d %H:%M"),
-                ),
-            )
-            conn.commit()
-            conn.close()
+          # Formattazione data italiana (es. 29/07/2026)
+          data_formattata = data_scelta.strftime("%d/%m/%Y")
 
-            # Formattazione data italiana (es. 29/07/2026)
-            data_formattata = data_scelta.strftime("%d/%m/%Y")
-
-            # Salva il messaggio di successo e ricarica la pagina
-            st.session_state["booking_success_msg"] = (
-                f"🎉 PRENOTAZIONE CONFERMATA!\n\nGrazie {nome}, ti aspettiamo il"
-                f" {data_formattata} alle ore {ora_scelta} per {trattamento}."
-            )
-            st.rerun()
+          # Salva il messaggio di successo e ricarica la pagina
+          st.session_state["booking_success_msg"] = (
+              f"🎉 PRENOTAZIONE CONFERMATA!\n\nGrazie {nome}, ti aspettiamo il"
+              f" {data_formattata} alle ore {ora_scelta} per {trattamento}."
+          )
+          st.rerun()
 
   # TAB 2: INFO STUDIO
   with tab2:
