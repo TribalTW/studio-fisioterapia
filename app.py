@@ -11,20 +11,21 @@ st.set_page_config(
     layout="centered",
 )
 
-# Personalizzazione Stile CSS
+# Personalizzazione Stile CSS Avanzato
 st.markdown(
     """
     <style>
-    /* 1. Sfondo rosa per il riquadro nativo di Streamlit */
-    div[data-testid="stVerticalBlockBorderWrapper"] {
+    /* 1. Sfondo rosa per il riquadro esterno */
+    [data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #FCE4EC !important;
         padding: 15px !important;
         border-radius: 16px !important;
         border: 1px solid #F8BBD0 !important;
     }
     
-    /* 2. Rimuove gli sfondi bianchi dei layer interni al box */
-    div[data-testid="stVerticalBlockBorderWrapper"] div {
+    /* 2. Rende trasparenti i blocchi interni al contenitore rosa */
+    [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stVerticalBlock"],
+    [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stHorizontalBlock"] {
         background-color: transparent !important;
     }
     
@@ -199,7 +200,7 @@ else:
       st.success(st.session_state["booking_success_msg"])
       del st.session_state["booking_success_msg"]
 
-    # RIQUADRO ROSA NATIVO (Con campi all'interno e sfondo forzato)
+    # RIQUADRO ROSA NATIVO
     with st.container(border=True):
       nome = st.text_input("Nome e Cognome *")
       trattamento = st.selectbox(
