@@ -15,22 +15,15 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    /* Contenitore Rosa Personalizzato */
-    .pink-box {
+    /* Riquadro rosa nativo di Streamlit (border=True) */
+    div[data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #FCE4EC !important;
-        padding: 25px !important;
+        padding: 15px !important;
         border-radius: 16px !important;
         border: 1px solid #F8BBD0 !important;
-        margin-bottom: 20px !important;
     }
     
-    /* Forza gli elementi dentro il box rosa ad avere il massimo contrasto */
-    .pink-box label {
-        color: #880E4F !important;
-        font-weight: 600 !important;
-    }
-
-    /* Campi di testo, selezioni e selettore data con sfondo bianco lucido */
+    /* Campi di testo, selezioni e selettore data con sfondo bianco */
     .stTextInput input, .stSelectbox > div > div, .stDateInput input {
         background-color: #FFFFFF !important;
         border-radius: 8px !important;
@@ -201,64 +194,63 @@ else:
       st.success(st.session_state["booking_success_msg"])
       del st.session_state["booking_success_msg"]
 
-    # APERTURA BOX ROSA (HTML + CSS)
-    st.markdown('<div class="pink-box">', unsafe_allow_html=True)
-
-    nome = st.text_input("Nome e Cognome *")
-    trattamento = st.selectbox(
-        "Seleziona Trattamento / Lezione *",
-        [
-            "Valutazione Posturale",
-            "Lezione Pilates Individuale",
-            "Pilates Duetto (in coppia)",
-            "Rieducazione Posturale Motorìa",
-        ],
-    )
-
-    # DATA ED ORA AFFIANCATE IN DUE COLONNE DENTRO IL BOX ROSA
-    col1, col2 = st.columns(2)
-
-    with col1:
-      data_scelta = st.date_input(
-          "Seleziona Data *", min_value=datetime.today()
+    # RIQUADRO ROSA NATIVO (Tutti i campi al suo interno)
+    with st.container(border=True):
+      nome = st.text_input("Nome e Cognome *")
+      trattamento = st.selectbox(
+          "Seleziona Trattamento / Lezione *",
+          [
+              "Valutazione Posturale",
+              "Lezione Pilates Individuale",
+              "Pilates Duetto (in coppia)",
+              "Rieducazione Posturale Motorìa",
+          ],
       )
 
-    # Calcolo orari già occupati per la data selezionata
-    conn = sqlite3.connect("prenotazioni.db")
-    c = conn.cursor()
-    c.execute(
-        "SELECT ora FROM prenotazioni WHERE data = ?", (str(data_scelta),)
-    )
-    orari_occupati = [row[0] for row in c.fetchall()]
-    conn.close()
+      # DATA ED ORA AFFIANCATE IN DUE COLONNE DENTRO IL BOX ROSA
+      col1, col2 = st.columns(2)
 
-    TUTTI_GLI_ORARI = [
-        "08:00",
-        "09:00",
-        "10:00",
-        "11:00",
-        "15:00",
-        "16:00",
-        "17:00",
-        "18:00",
-        "19:00",
-    ]
-    orari_disponibili = [h for h in TUTTI_GLI_ORARI if h not in orari_occupati]
-
-    with col2:
-      if orari_disponibili:
-        ora_scelta = st.selectbox("Seleziona Ora *", orari_disponibili)
-      else:
-        st.selectbox(
-            "Seleziona Ora *", ["Tutto occupato"], disabled=True, key="dis_ora"
+      with col1:
+        data_scelta = st.date_input(
+            "Seleziona Data *", min_value=datetime.today()
         )
-        ora_scelta = None
 
-    submitted = st.button("Conferma Prenotazione", type="primary")
+      # Calcolo orari già occupati per la data selezionata
+      conn = sqlite3.connect("prenotazioni.db")
+      c = conn.cursor()
+      c.execute(
+          "SELECT ora FROM prenotazioni WHERE data = ?", (str(data_scelta),)
+      )
+      orari_occupati = [row[0] for row in c.fetchall()]
+      conn.close()
 
-    # CHIUSURA BOX ROSA
-    st.markdown("</div>", unsafe_allow_html=True)
+      TUTTI_GLI_ORARI = [
+          "08:00",
+          "09:00",
+          "10:00",
+          "11:00",
+          "15:00",
+          "16:00",
+          "17:00",
+          "18:00",
+          "19:00",
+      ]
+      orari_disponibili = [
+          h for h in TUTTI_GLI_ORARI if h not in orari_occupati
+      ]
 
+      with col2:
+        if orari_disponibili:
+          ora_scelta = st.selectbox("Seleziona Ora *", orari_disponibili)
+        else:
+          st.selectbox(
+              "Seleziona Ora *", ["Tutto occupato"], disabled=True, key="dis_ora"
+          )
+          ora_scelta = None
+
+      submitted = st.button("Conferma Prenotazione", type="primary")
+
+    # Logica di salvataggio esterna al blocco grafico
     if submitted:
       if not nome.strip():
         st.error("Per favore inserisci il tuo nome e cognome.")
