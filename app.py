@@ -16,11 +16,11 @@ st.markdown(
     """
     <style>
     /* Riquadro rosa per il modulo di prenotazione */
-    [data-testid="stForm"] {
-        background-color: #FCE4EC;
-        padding: 25px;
-        border-radius: 16px;
-        border: 1px solid #F8BBD0;
+    [data-testid="stVerticalBlockBorderWrapper"] {
+        background-color: #FCE4EC !important;
+        padding: 25px !important;
+        border-radius: 16px !important;
+        border: 1px solid #F8BBD0 !important;
     }
     
     /* Campi di testo, selezioni e selettore data con sfondo bianco */
@@ -31,7 +31,7 @@ st.markdown(
     }
     
     /* Pulsante di conferma rosa magenta */
-    div[data-testid="stFormSubmitButton"] > button {
+    div.stButton > button {
         background-color: #D81B60 !important;
         color: white !important;
         border-radius: 10px !important;
@@ -43,13 +43,19 @@ st.markdown(
         margin-top: 10px !important;
     }
     
-    div[data-testid="stFormSubmitButton"] > button:hover {
+    div.stButton > button:hover {
         background-color: #C2185B !important;
     }
     
     /* Titoli in rosa scuro */
     h1, h2, h3 {
         color: #880E4F !important;
+        text-align: center;
+    }
+    
+    /* Centra i sottotitoli */
+    .stCaption, p {
+        text-align: center;
     }
     
     /* Nasconde menu standard Streamlit */
@@ -81,7 +87,7 @@ def init_db():
 
 init_db()
 
-# --- BARRA LATERALE (Logo & Admin) ---
+# Cerca se esiste il file del logo
 logo_path = None
 for possible_name in [
     "logo.png",
@@ -94,13 +100,11 @@ for possible_name in [
     logo_path = possible_name
     break
 
+
+# --- BARRA LATERALE (Admin & Logo) ---
 if logo_path:
   st.sidebar.image(logo_path, use_container_width=True)
-else:
-  st.sidebar.title("🧘‍♀️ Postura & Pilates")
-  st.sidebar.caption("Dott.ssa Roberta Sinagra")
 
-st.sidebar.markdown("---")
 st.sidebar.title("🔐 Area Riservata (Admin)")
 
 ADMIN_PASSWORD = "MiaPassword2026!"
@@ -164,8 +168,14 @@ if st.session_state["admin_logged_in"]:
 
 # --- VISTA 2: PAGINA PRINCIPALE CLIENTE ---
 else:
+  # MOSTRA IL LOGO CENTRATO IN CIMA ALLA PAGINA
+  if logo_path:
+    c1, c2, c3 = st.columns([1, 2, 1])
+    with c2:
+      st.image(logo_path, use_container_width=True)
+
   st.title("Postura & Pilates")
-  st.subheader("Dott.ssa Roberta Sinagra")
+  st.write("**Dott.ssa Roberta Sinagra**")
 
   # Schede di Navigazione
   tab1, tab2, tab3, tab4 = st.tabs([
@@ -175,18 +185,18 @@ else:
       "📜 Regolamento",
   ])
 
-  # TAB 1: PRENOTAZIONE DINAMICA
+  # TAB 1: PRENOTAZIONE DINAMICA E REATTIVA
   with tab1:
     st.markdown("### Modulo di Prenotazione")
 
-    # Messaggio di conferma in verde se presente
+    # Messaggio di conferma verde se presente
     if "booking_success_msg" in st.session_state:
       st.success(st.session_state["booking_success_msg"])
       del st.session_state["booking_success_msg"]
 
-    # TUTTO DENTRO IL QUADRATO ROSA
-    with st.form("booking_form", clear_on_submit=True):
-      nome = st.text_input("Nome e Cognome *")
+    # RIQUADRO ROSA DINAMICO (SENZA ST.FORM PER AGGIORNAMENTI IN TEMPO REALE)
+    with st.container(border=True):
+      nome = st.text_input("Nome e Cognome *", key="nome_input")
       trattamento = st.selectbox(
           "Seleziona Trattamento / Lezione *",
           [
@@ -195,17 +205,18 @@ else:
               "Pilates Duetto (in coppia)",
               "Rieducazione Posturale Motorìa",
           ],
+          key="trattamento_input",
       )
 
-      # DATA ED ORA AFFIANCATE IN DUE COLONNE DENTRO IL FORM
+      # DATA ED ORA AFFIANCATE IN DUE COLONNE DENTRO IL BOX ROSA
       col1, col2 = st.columns(2)
 
       with col1:
         data_scelta = st.date_input(
-            "Seleziona Data *", min_value=datetime.today()
+            "Seleziona Data *", min_value=datetime.today(), key="data_input"
         )
 
-      # Calcolo orari già occupati per la data selezionata
+      # Calcolo orari già occupati per la data selezionata (indipendentemente dal trattamento!)
       conn = sqlite3.connect("prenotazioni.db")
       c = conn.cursor()
       c.execute(
@@ -231,21 +242,29 @@ else:
 
       with col2:
         if orari_disponibili:
-          ora_scelta = st.selectbox("Seleziona Ora *", orari_disponibili)
-        else:
           ora_scelta = st.selectbox(
-              "Seleziona Ora *", ["Nessun orario disponibile"]
+              "Seleziona Ora *", orari_disponibili, key="ora_input"
           )
+        else:
+          st.selectbox(
+              "Seleziona Ora *",
+              ["Tutto occupato"],
+              disabled=True,
+              key="ora_input_disabled",
+          )
+          ora_scelta = None
 
-      submitted = st.form_submit_button("Conferma Prenotazione")
+      submitted = st.button("Conferma Prenotazione", type="primary")
 
       if submitted:
-        if nome.strip() == "":
+        if not nome.strip():
           st.error("Per favore inserisci il tuo nome e cognome.")
-        elif ora_scelta == "Nessun orario disponibile":
-          st.error("Spiacenti, tutti gli orari per questa data sono occupati.")
+        elif not ora_scelta or ora_scelta == "Tutto occupato":
+          st.error(
+              "Spiacenti, tutti gli orari per questa data sono già occupati."
+          )
         else:
-          # Controllo sicurezza sovrapposizione
+          # Controllo sicurezza finale sovrapposizione
           conn = sqlite3.connect("prenotazioni.db")
           c = conn.cursor()
           c.execute(
@@ -275,9 +294,14 @@ else:
             conn.commit()
             conn.close()
 
+            # Formattazione data italiana (es. 29/07/2026)
+            data_formattata = data_scelta.strftime("%d/%m/%Y")
+
+            # Salva il messaggio di successo e svuota il nome
+            st.session_state["nome_input"] = ""
             st.session_state["booking_success_msg"] = (
                 f"🎉 PRENOTAZIONE CONFERMATA!\n\nGrazie {nome}, ti aspettiamo il"
-                f" {data_scelta} alle ore {ora_scelta} per {trattamento}."
+                f" {data_formattata} alle ore {ora_scelta} per {trattamento}."
             )
             st.rerun()
 
