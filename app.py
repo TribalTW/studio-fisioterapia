@@ -24,7 +24,7 @@ st.markdown(
     }
     
     /* Campi di testo e selezioni */
-    .stTextInput input, .stSelectbox > div > div {
+    .stTextInput input, .stSelectbox > div > div, .stDateInput input {
         background-color: #FFFFFF !important;
         border-radius: 8px !important;
         border: 1px solid #E0E0E0 !important;
