@@ -11,21 +11,20 @@ st.set_page_config(
     layout="centered",
 )
 
-# Personalizzazione Stile CSS con riquadro rosa e campi bianchi
+# Stile CSS con forzatura mirata dello sfondo del riquadro
 st.markdown(
     """
     <style>
-    /* Sfondo rosa per il riquadro nativo di Streamlit con bordo */
-    div[data-testid="stVerticalBlockBorderWrapper"] {
+    /* Forzatura assoluta dello sfondo rosa per il contenitore del modulo */
+    div.stVerticalBlockBorderWrapper, div[data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #FCE4EC !important;
-        padding: 15px !important;
-        border-radius: 16px !important;
         border: 1px solid #F8BBD0 !important;
+        border-radius: 16px !important;
+        padding: 20px !important;
     }
     
-    /* Rende trasparenti i blocchi interni al contenitore rosa per far emergere il colore */
-    div[data-testid="stVerticalBlockBorderWrapper"] div[data-testid="stVerticalBlock"],
-    div[data-testid="stVerticalBlockBorderWrapper"] div[data-testid="stHorizontalBlock"] {
+    /* Rende trasparenti i blocchi interni al box rosa */
+    div[data-testid="stVerticalBlockBorderWrapper"] div {
         background-color: transparent !important;
     }
     
