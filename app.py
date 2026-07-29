@@ -194,9 +194,9 @@ else:
       st.success(st.session_state["booking_success_msg"])
       del st.session_state["booking_success_msg"]
 
-    # RIQUADRO ROSA DINAMICO (SENZA ST.FORM PER AGGIORNAMENTI IN TEMPO REALE)
+    # RIQUADRO ROSA DINAMICO
     with st.container(border=True):
-      nome = st.text_input("Nome e Cognome *", key="nome_input")
+      nome = st.text_input("Nome e Cognome *")
       trattamento = st.selectbox(
           "Seleziona Trattamento / Lezione *",
           [
@@ -205,7 +205,6 @@ else:
               "Pilates Duetto (in coppia)",
               "Rieducazione Posturale Motorìa",
           ],
-          key="trattamento_input",
       )
 
       # DATA ED ORA AFFIANCATE IN DUE COLONNE DENTRO IL BOX ROSA
@@ -213,10 +212,10 @@ else:
 
       with col1:
         data_scelta = st.date_input(
-            "Seleziona Data *", min_value=datetime.today(), key="data_input"
+            "Seleziona Data *", min_value=datetime.today()
         )
 
-      # Calcolo orari già occupati per la data selezionata (indipendentemente dal trattamento!)
+      # Calcolo orari già occupati per la data selezionata
       conn = sqlite3.connect("prenotazioni.db")
       c = conn.cursor()
       c.execute(
@@ -242,15 +241,10 @@ else:
 
       with col2:
         if orari_disponibili:
-          ora_scelta = st.selectbox(
-              "Seleziona Ora *", orari_disponibili, key="ora_input"
-          )
+          ora_scelta = st.selectbox("Seleziona Ora *", orari_disponibili)
         else:
           st.selectbox(
-              "Seleziona Ora *",
-              ["Tutto occupato"],
-              disabled=True,
-              key="ora_input_disabled",
+              "Seleziona Ora *", ["Tutto occupato"], disabled=True, key="dis_ora"
           )
           ora_scelta = None
 
@@ -297,8 +291,7 @@ else:
             # Formattazione data italiana (es. 29/07/2026)
             data_formattata = data_scelta.strftime("%d/%m/%Y")
 
-            # Salva il messaggio di successo e svuota il nome
-            st.session_state["nome_input"] = ""
+            # Salva il messaggio di successo senza toccare i widget key
             st.session_state["booking_success_msg"] = (
                 f"🎉 PRENOTAZIONE CONFERMATA!\n\nGrazie {nome}, ti aspettiamo il"
                 f" {data_formattata} alle ore {ora_scelta} per {trattamento}."
