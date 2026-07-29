@@ -11,7 +11,7 @@ st.set_page_config(
     layout="centered",
 )
 
-# Personalizzazione Stile CSS (Riquadro rosa ripristinato)
+# Personalizzazione Stile CSS (Riquadro rosa)
 st.markdown(
     """
     <style>
@@ -245,22 +245,75 @@ if st.session_state["admin_logged_in"]:
     conn.close()
     st.rerun()
 
+  # SEZIONE SBLOCCO SPECULARE AL BLOCCO
   st.markdown("---")
-  st.subheader("🗑️ Elimina / Sblocca Prenotazione o Chiusura")
-  id_da_eliminare = st.number_input(
-      "Inserisci l'ID della prenotazione o del blocco da cancellare:",
-      min_value=1,
-      step=1,
+  st.subheader("🔓 Gestione Sblocchi Studio")
+  st.write(
+      "Seleziona una data per sbloccare l'intera giornata o un singolo orario."
   )
-  if st.button("Elimina / Sblocca"):
+
+  col_s1, col_s2 = st.columns(2)
+  with col_s1:
+    data_sblocco = st.date_input(
+        "Data da sbloccare",
+        min_value=datetime.today(),
+        key="data_sblocco_input",
+    )
+  with col_s2:
+    tipo_sblocco = st.radio(
+        "Tipo di sblocco",
+        ["Tutta la giornata", "Orario specifico"],
+        key="tipo_sblocco_input",
+    )
+
+  ora_sblocco = None
+  if tipo_sblocco == "Orario specifico":
+    # Recupera gli orari effettivamente occupati/bloccati in quella data
     conn = sqlite3.connect("prenotazioni.db")
     c = conn.cursor()
-    c.execute("DELETE FROM prenotazioni WHERE id = ?", (id_da_eliminare,))
+    c.execute(
+        "SELECT ora, nome FROM prenotazioni WHERE data = ?",
+        (str(data_sblocco),),
+    )
+    slot_occupati = c.fetchall()
+    conn.close()
+
+    orari_occupati_data = [row[0] for row in slot_occupati]
+    if orari_occupati_data:
+      ora_sblocco = st.selectbox(
+          "Seleziona Orario da sbloccare",
+          orari_occupati_data,
+          key="ora_sblocco_input",
+      )
+    else:
+      st.info("Nessun orario occupato o bloccato in questa data.")
+
+  if st.button("Conferma Sblocco Studio"):
+    conn = sqlite3.connect("prenotazioni.db")
+    c = conn.cursor()
+
+    if tipo_sblocco == "Tutta la giornata":
+      c.execute("DELETE FROM prenotazioni WHERE data = ?", (str(data_sblocco),))
+      st.success(
+          f"Tutti gli impegni e chiusure del"
+          f" {data_sblocco.strftime('%d/%m/%Y')} sono stati rimossi e"
+          " sbloccati!"
+      )
+    else:
+      if ora_sblocco:
+        c.execute(
+            "DELETE FROM prenotazioni WHERE data = ? AND ora = ?",
+            (str(data_sblocco), ora_sblocco),
+        )
+        st.success(
+            f"Orario {ora_sblocco} del {data_sblocco.strftime('%d/%m/%Y')}"
+            " sbloccato con successo!"
+        )
+      else:
+        st.warning("Nessun orario valido selezionato da sbloccare.")
+
     conn.commit()
     conn.close()
-    st.success(
-        f"Elemento ID {id_da_eliminare} rimosso! L'orario è di nuovo disponibile."
-    )
     st.rerun()
 
 
