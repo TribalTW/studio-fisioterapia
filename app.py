@@ -72,11 +72,10 @@ st.markdown(
 )
 
 
-# Inizializzazione Database SQLite con supporto IP e Ban
+# Inizializzazione Database SQLite con aggiornamento automatico sicuro delle colonne
 def init_db():
   conn = sqlite3.connect("prenotazioni.db")
   c = conn.cursor()
-  # Tabella prenotazioni con colonna IP
   c.execute("""
         CREATE TABLE IF NOT EXISTS prenotazioni (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -88,7 +87,12 @@ def init_db():
             ip TEXT
         )
     """)
-  # Tabella IP bannati
+  # Aggiunge la colonna ip se la tabella esisteva già ma ne era sprovvista
+  try:
+    c.execute("ALTER TABLE prenotazioni ADD COLUMN ip TEXT")
+  except sqlite3.OperationalError:
+    pass  # La colonna esiste già, proseguiamo
+
   c.execute("""
         CREATE TABLE IF NOT EXISTS banned_ips (
             ip TEXT PRIMARY KEY
