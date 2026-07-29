@@ -72,10 +72,11 @@ st.markdown(
 )
 
 
-# Inizializzazione Database SQLite
+# Inizializzazione Database SQLite con supporto IP e Ban
 def init_db():
   conn = sqlite3.connect("prenotazioni.db")
   c = conn.cursor()
+  # Tabella prenotazioni con colonna IP
   c.execute("""
         CREATE TABLE IF NOT EXISTS prenotazioni (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -83,7 +84,14 @@ def init_db():
             data TEXT NOT NULL,
             ora TEXT NOT NULL,
             trattamento TEXT NOT NULL,
-            data_creazione TEXT NOT NULL
+            data_creazione TEXT NOT NULL,
+            ip TEXT
+        )
+    """)
+  # Tabella IP bannati
+  c.execute("""
+        CREATE TABLE IF NOT EXISTS banned_ips (
+            ip TEXT PRIMARY KEY
         )
     """)
   conn.commit()
@@ -91,6 +99,19 @@ def init_db():
 
 
 init_db()
+
+
+# Funzione per ricavare l'IP del client
+def get_client_ip():
+  try:
+    if hasattr(st, "context") and hasattr(st.context, "headers"):
+      forwarded = st.context.headers.get("X-Forwarded-For", "")
+      if forwarded:
+        return forwarded.split(",")[0].strip()
+  except Exception:
+    pass
+  return "127.0.0.1"
+
 
 # Cerca se esiste il file del logo
 logo_path = None
@@ -138,11 +159,11 @@ if st.session_state["admin_logged_in"]:
 
 # --- VISTA 1: PANNELLO AMMINISTRATORE ---
 if st.session_state["admin_logged_in"]:
-  st.title("📊 Gestione Appuntamenti (Admin)")
+  st.title("📊 Gestione Appuntamenti & Sicurezza (Admin)")
 
   conn = sqlite3.connect("prenotazioni.db")
   df = pd.read_sql_query(
-      "SELECT id, nome, data, ora, trattamento, data_creazione FROM"
+      "SELECT id, nome, data, ora, trattamento, data_creazione, ip FROM"
       " prenotazioni ORDER BY data DESC, ora ASC",
       conn,
   )
@@ -153,6 +174,72 @@ if st.session_state["admin_logged_in"]:
   else:
     st.info("Nessuna prenotazione presente nel database.")
 
+  # SEZIONE GESTIONE BAN / CANCELLAZIONE PUNTUALE
+  st.markdown("---")
+  st.subheader("🚫 Gestione Spam e Sicurezza IP")
+
+  col_ban1, col_ban2 = st.columns(2)
+  with col_ban1:
+    id_da_eliminare = st.number_input(
+        "ID Prenotazione da eliminare",
+        min_value=0,
+        step=1,
+        key="id_elimina_input",
+    )
+    if st.button("Elimina Singola Prenotazione"):
+      if id_da_eliminare > 0:
+        conn = sqlite3.connect("prenotazioni.db")
+        c = conn.cursor()
+        c.execute("DELETE FROM prenotazioni WHERE id = ?", (id_da_eliminare,))
+        conn.commit()
+        conn.close()
+        st.success(
+            f"Prenotazione con ID {id_da_eliminare} eliminata con successo!"
+        )
+        st.rerun()
+
+  with col_ban2:
+    ip_da_bannare = st.text_input(
+        "Indirizzo IP da bannare", key="ip_ban_input"
+    )
+    if st.button("Banna Indirizzo IP"):
+      if ip_da_bannare.strip():
+        conn = sqlite3.connect("prenotazioni.db")
+        c = conn.cursor()
+        try:
+          c.execute(
+              "INSERT OR IGNORE INTO banned_ips (ip) VALUES (?)",
+              (ip_da_bannare.strip(),),
+          )
+          conn.commit()
+          st.success(f"L'IP {ip_da_bannare} è stato inserito nella blacklist.")
+        except Exception as e:
+          st.error(f"Errore: {e}")
+        finally:
+          conn.close()
+        st.rerun()
+
+  # Mostra lista IP bannati
+  conn = sqlite3.connect("prenotazioni.db")
+  df_banned = pd.read_sql_query("SELECT * FROM banned_ips", conn)
+  conn.close()
+  if not df_banned.empty:
+    with st.expander("Visualizza IP attualmente bannati"):
+      st.dataframe(df_banned, use_container_width=True)
+      ip_da_sbannare = st.selectbox(
+          "Seleziona IP da rimuovere dal ban",
+          df_banned["ip"].tolist(),
+          key="sbianca_ip",
+      )
+      if st.button("Rimuovi Ban IP"):
+        conn = sqlite3.connect("prenotazioni.db")
+        c = conn.cursor()
+        c.execute("DELETE FROM banned_ips WHERE ip = ?", (ip_da_sbannare,))
+        conn.commit()
+        conn.close()
+        st.success(f"IP {ip_da_sbannare} sbannato con successo!")
+        st.rerun()
+
   st.markdown("---")
   st.subheader("🔒 Gestione Chiusure / Blocchi Studio (anche a intervallo)")
   st.write(
@@ -162,7 +249,6 @@ if st.session_state["admin_logged_in"]:
 
   col_b1, col_b2 = st.columns(2)
   with col_b1:
-    # Usando una tupla come valore iniziale, Streamlit abilita la selezione dell'intervallo di date
     data_blocco = st.date_input(
         "Data o Intervallo da gestire",
         value=(datetime.today(), datetime.today()),
@@ -199,7 +285,6 @@ if st.session_state["admin_logged_in"]:
     conn = sqlite3.connect("prenotazioni.db")
     c = conn.cursor()
 
-    # Gestione singola data o intervallo di date
     if isinstance(data_blocco, tuple):
       if len(data_blocco) == 2:
         lista_date = pd.date_range(
@@ -222,13 +307,14 @@ if st.session_state["admin_logged_in"]:
           if not c.fetchone():
             c.execute(
                 "INSERT INTO prenotazioni (nome, data, ora, trattamento,"
-                " data_creazione) VALUES (?, ?, ?, ?, ?)",
+                " data_creazione, ip) VALUES (?, ?, ?, ?, ?, ?)",
                 (
                     "🔒 STUDIO CHIUSO",
                     d_str,
                     h,
                     "Chiusura Admin",
                     datetime.now().strftime("%Y-%m-%d %H:%M"),
+                    "SYSTEM",
                 ),
             )
       else:
@@ -239,13 +325,14 @@ if st.session_state["admin_logged_in"]:
         if not c.fetchone():
           c.execute(
               "INSERT INTO prenotazioni (nome, data, ora, trattamento,"
-              " data_creazione) VALUES (?, ?, ?, ?, ?)",
+              " data_creazione, ip) VALUES (?, ?, ?, ?, ?, ?)",
               (
                   "🔒 ORARIO CHIUSO",
                   d_str,
                   ora_blocco,
                   "Chiusura Admin",
                   datetime.now().strftime("%Y-%m-%d %H:%M"),
+                  "SYSTEM",
               ),
           )
 
@@ -281,7 +368,6 @@ if st.session_state["admin_logged_in"]:
   if tipo_sblocco == "Orario specifico":
     conn = sqlite3.connect("prenotazioni.db")
     c = conn.cursor()
-    # Se viene selezionato un intervallo, mostra gli orari occupati del primo giorno o generali
     data_rif = (
         data_sblocco[0]
         if isinstance(data_sblocco, tuple)
@@ -339,178 +425,191 @@ if st.session_state["admin_logged_in"]:
 
 # --- VISTA 2: PAGINA PRINCIPALE CLIENTE ---
 else:
-  # MOSTRA IL LOGO CENTRATO IN CIMA ALLA PAGINA
-  if logo_path:
-    c1, c2, c3 = st.columns([1, 2, 1])
-    with c2:
-      st.image(logo_path, use_container_width=True)
+  # Controllo preventivo se l'IP del client è bannato
+  client_ip = get_client_ip()
+  conn = sqlite3.connect("prenotazioni.db")
+  c = conn.cursor()
+  c.execute("SELECT ip FROM banned_ips WHERE ip = ?", (client_ip,))
+  is_banned = c.fetchone()
+  conn.close()
 
-  st.title("Postura & Pilates")
-  st.write("**Dott.ssa Roberta Sinagra**")
+  if is_banned:
+    st.error(
+        "⛔ Accesso negato: il tuo indirizzo IP è stato bloccato per violazione"
+        " delle regole del servizio."
+    )
+  else:
+    # MOSTRA IL LOGO CENTRATO IN CIMA ALLA PAGINA
+    if logo_path:
+      c1, c2, c3 = st.columns([1, 2, 1])
+      with c2:
+        st.image(logo_path, use_container_width=True)
 
-  # Schede di Navigazione
-  tab1, tab2, tab3, tab4 = st.tabs([
-      "📅 Prenota",
-      "ℹ️ Info Studio",
-      "📍 Dove Siamo",
-      "📜 Regolamento",
-  ])
+    st.title("Postura & Pilates")
+    st.write("**Dott.ssa Roberta Sinagra**")
 
-  # TAB 1: PRENOTAZIONE DINAMICA E REATTIVA
-  with tab1:
-    st.markdown("### Modulo di Prenotazione")
+    # Schede di Navigazione
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "📅 Prenota",
+        "ℹ️ Info Studio",
+        "📍 Dove Siamo",
+        "📜 Regolamento",
+    ])
 
-    # RESET SELETTIVO: Pulisce solo il nome dopo la conferma
-    if st.session_state.get("reset_nome_flag", False):
-      st.session_state["nome_input"] = ""
-      st.session_state["reset_nome_flag"] = False
+    # TAB 1: PRENOTAZIONE DINAMICA E REATTIVA
+    with tab1:
+      st.markdown("### Modulo di Prenotazione")
 
-    # Messaggio di conferma verde se presente
-    if "booking_success_msg" in st.session_state:
-      st.success(st.session_state["booking_success_msg"])
-      del st.session_state["booking_success_msg"]
+      # RESET SELETTIVO: Pulisce solo il nome dopo la conferma
+      if st.session_state.get("reset_nome_flag", False):
+        st.session_state["nome_input"] = ""
+        st.session_state["reset_nome_flag"] = False
 
-    # RIQUADRO ROSA NATIVO
-    with st.container(border=True):
-      nome = st.text_input("Nome e Cognome *", key="nome_input")
-      trattamento = st.selectbox(
-          "Seleziona Trattamento / Lezione *",
-          [
-              "Valutazione Posturale",
-              "Lezione Pilates Individuale",
-              "Pilates Duetto (in coppia)",
-              "Rieducazione Posturale Motorìa",
-          ],
-          key="trattamento_input",
-      )
+      # Messaggio di conferma verde se presente
+      if "booking_success_msg" in st.session_state:
+        st.success(st.session_state["booking_success_msg"])
+        del st.session_state["booking_success_msg"]
 
-      # DATA ED ORA AFFIANCATE IN DUE COLONNE
-      col1, col2 = st.columns(2)
-
-      with col1:
-        data_scelta = st.date_input(
-            "Seleziona Data *", min_value=datetime.today(), key="data_input"
+      # RIQUADRO ROSA NATIVO
+      with st.container(border=True):
+        nome = st.text_input("Nome e Cognome *", key="nome_input")
+        trattamento = st.selectbox(
+            "Seleziona Trattamento / Lezione *",
+            [
+                "Valutazione Posturale",
+                "Lezione Pilates Individuale",
+                "Pilates Duetto (in coppia)",
+                "Rieducazione Posturale Motorìa",
+            ],
+            key="trattamento_input",
         )
 
-      # Calcolo orari già occupati o bloccati per la data selezionata
-      conn = sqlite3.connect("prenotazioni.db")
-      c = conn.cursor()
-      c.execute(
-          "SELECT ora FROM prenotazioni WHERE data = ?", (str(data_scelta),)
-      )
-      orari_occupati = [row[0] for row in c.fetchall()]
-      conn.close()
+        # DATA ED ORA AFFIANCATE IN DUE COLONNE
+        col1, col2 = st.columns(2)
 
-      TUTTI_GLI_ORARI = [
-          "08:00",
-          "09:00",
-          "10:00",
-          "11:00",
-          "15:00",
-          "16:00",
-          "17:00",
-          "18:00",
-          "19:00",
-      ]
-      orari_disponibili = [
-          h for h in TUTTI_GLI_ORARI if h not in orari_occupati
-      ]
-
-      with col2:
-        if orari_disponibili:
-          ora_scelta = st.selectbox(
-              "Seleziona Ora *", orari_disponibili, key="ora_input"
+        with col1:
+          data_scelta = st.date_input(
+              "Seleziona Data *", min_value=datetime.today(), key="data_input"
           )
-        else:
-          st.selectbox(
-              "Seleziona Ora *",
-              ["Tutto occupato"],
-              disabled=True,
-              key="dis_ora_occupato",
-          )
-          ora_scelta = None
 
-      submitted = st.button("Conferma Prenotazione", type="primary")
-
-    # Logica di salvataggio
-    if submitted:
-      if not nome.strip():
-        st.error("Per favore inserisci il tuo nome e cognome.")
-      elif not ora_scelta or ora_scelta == "Tutto occupato":
-        st.error("Spiacenti, tutti gli orari per questa data sono già occupati.")
-      else:
-        # Controllo sicurezza finale sovrapposizione
+        # Calcolo orari già occupati o bloccati per la data selezionata
         conn = sqlite3.connect("prenotazioni.db")
         c = conn.cursor()
         c.execute(
-            "SELECT id FROM prenotazioni WHERE data = ? AND ora = ?",
-            (str(data_scelta), ora_scelta),
+            "SELECT ora FROM prenotazioni WHERE data = ?", (str(data_scelta),)
         )
-        gia_prenotato = c.fetchone()
+        orari_occupati = [row[0] for row in c.fetchall()]
+        conn.close()
 
-        if gia_prenotato:
+        TUTTI_GLI_ORARI = [
+            "08:00",
+            "09:00",
+            "10:00",
+            "11:00",
+            "15:00",
+            "16:00",
+            "17:00",
+            "18:00",
+            "19:00",
+        ]
+        orari_disponibili = [
+            h for h in TUTTI_GLI_ORARI if h not in orari_occupati
+        ]
+
+        with col2:
+          if orari_disponibili:
+            ora_scelta = st.selectbox(
+                "Seleziona Ora *", orari_disponibili, key="ora_input"
+            )
+          else:
+            st.selectbox(
+                "Seleziona Ora *",
+                ["Tutto occupato"],
+                disabled=True,
+                key="dis_ora_occupato",
+            )
+            ora_scelta = None
+
+        submitted = st.button("Conferma Prenotazione", type="primary")
+
+      # Logica di salvataggio con salvataggio IP
+      if submitted:
+        if not nome.strip():
+          st.error("Per favore inserisci il tuo nome e cognome.")
+        elif not ora_scelta or ora_scelta == "Tutto occupato":
           st.error(
-              "⚠️ Spiacenti, questo orario è stato appena occupato! Riprova con"
-              " un altro orario."
+              "Spiacenti, tutti gli orari per questa data sono già occupati."
           )
-          conn.close()
         else:
+          conn = sqlite3.connect("prenotazioni.db")
+          c = conn.cursor()
           c.execute(
-              "INSERT INTO prenotazioni (nome, data, ora, trattamento,"
-              " data_creazione) VALUES (?, ?, ?, ?, ?)",
-              (
-                  nome,
-                  str(data_scelta),
-                  ora_scelta,
-                  trattamento,
-                  datetime.now().strftime("%Y-%m-%d %H:%M"),
-              ),
+              "SELECT id FROM prenotazioni WHERE data = ? AND ora = ?",
+              (str(data_scelta), ora_scelta),
           )
-          conn.commit()
-          conn.close()
+          gia_prenotato = c.fetchone()
 
-          # Formattazione data italiana (es. 29/07/2026)
-          data_formattata = data_scelta.strftime("%d/%m/%Y")
+          if gia_prenotato:
+            st.error(
+                "⚠️ Spiacenti, questo orario è stato appena occupato! Riprova"
+                " con un altro orario."
+            )
+            conn.close()
+          else:
+            c.execute(
+                "INSERT INTO prenotazioni (nome, data, ora, trattamento,"
+                " data_creazione, ip) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    nome,
+                    str(data_scelta),
+                    ora_scelta,
+                    trattamento,
+                    datetime.now().strftime("%Y-%m-%d %H:%M"),
+                    client_ip,
+                ),
+            )
+            conn.commit()
+            conn.close()
 
-          # Messaggio di successo e attivazione flag per pulire solo il nome
-          st.session_state["booking_success_msg"] = (
-              f"🎉 PRENOTAZIONE CONFERMATA!\n\nGrazie {nome}, ti aspettiamo il"
-              f" {data_formattata} alle ore {ora_scelta} per {trattamento}."
-          )
-          st.session_state["reset_nome_flag"] = True
-          st.rerun()
+            data_formattata = data_scelta.strftime("%d/%m/%Y")
+            st.session_state["booking_success_msg"] = (
+                f"🎉 PRENOTAZIONE CONFERMATA!\n\nGrazie {nome}, ti aspettiamo il"
+                f" {data_formattata} alle ore {ora_scelta} per {trattamento}."
+            )
+            st.session_state["reset_nome_flag"] = True
+            st.rerun()
 
-  # TAB 2: INFO STUDIO
-  with tab2:
-    st.markdown("### ℹ️ Informazioni sullo Studio")
-    st.write(
-        "Benvenuti nello studio della **Dott.ssa Roberta Sinagra**,"
-        " specializzato in Posturologia e Pilates."
-    )
-    st.write(
-        "I nostri percorsi individuali e di coppia sono pensati per migliorare"
-        " la postura, prevenire dolori e ritrovare il benessere del corpo."
-    )
+    # TAB 2: INFO STUDIO
+    with tab2:
+      st.markdown("### ℹ️ Informazioni sullo Studio")
+      st.write(
+          "Benvenuti nello studio della **Dott.ssa Roberta Sinagra**,"
+          " specializzato in Posturologia e Pilates."
+      )
+      st.write(
+          "I nostri percorsi individuali e di coppia sono pensati per migliorare"
+          " la postura, prevenire dolori e ritrovare il benessere del corpo."
+      )
 
-  # TAB 3: DOVE SIAMO
-  with tab3:
-    st.markdown("### 📍 Dove Siamo & Contatti")
-    st.write("📍 **Indirizzo:** Inserisci qui l'indirizzo dello studio")
-    st.write("📞 **Telefono / WhatsApp:** +39 333 0000000")
-    st.write("✉️ **Email:** info@posturaepilates.it")
+    # TAB 3: DOVE SIAMO
+    with tab3:
+      st.markdown("### 📍 Dove Siamo & Contatti")
+      st.write("📍 **Indirizzo:** Inserisci qui l'indirizzo dello studio")
+      st.write("📞 **Telefono / WhatsApp:** +39 333 0000000")
+      st.write("✉️ **Email:** info@posturaepilates.it")
 
-  # TAB 4: REGOLAMENTO STUDIO
-  with tab4:
-    st.markdown("### 📜 Regolamento dello Studio")
-    st.write(
-        "Per garantire un ambiente sereno, pulito e professionale a tutti i"
-        " pazienti, vi preghiamo di prendere visione delle seguenti regole:"
-    )
+    # TAB 4: REGOLAMENTO STUDIO
+    with tab4:
+      st.markdown("### 📜 Regolamento dello Studio")
+      st.write(
+          "Per garantire un ambiente sereno, pulito e professionale a tutti i"
+          " pazienti, vi preghiamo di prendere visione delle seguenti regole:"
+      )
 
-    st.markdown("""
-        * 🕒 **Puntualità:** Si raccomanda di presentarsi circa 5 minuti prima dell'orario della seduta.
-        * 🧦 **Abbigliamento e Calzini:** È obbligatorio l'uso di **calzini antiscivolo** durante tutte le lezioni.
-        * 🧴 **Asciugamano:** Si richiede di portare un proprio asciugamano personale da stendere sui macchinari/tappetini.
-        * 📵 **Cellulari:** Vi chiediamo di mantenere il telefono in modalità silenziosa per rispettare la concentrazione e il relax.
-        * ⏱️ **Disdette:** Le disdette o gli spostamenti devono essere comunicati con almeno **24 ore di anticipo**. In caso contrario, la seduta verrà regolarmente conteggiata.
-        """)
+      st.markdown("""
+            * 🕒 **Puntualità:** Si raccomanda di presentarsi circa 5 minuti prima dell'orario della seduta.
+            * 🧦 **Abbigliamento e Calzini:** È obbligatorio l'uso di **calzini antiscivolo** durante tutte le lezioni.
+            * 🧴 **Asciugamano:** Si richiede di portare un proprio asciugamano personale da stendere sui macchinari/tappetini.
+            * 📵 **Cellulari:** Vi chiediamo di mantenere il telefono in modalità silenziosa per rispettare la concentrazione e il relax.
+            * ⏱️ **Disdette:** Le disdette o gli spostamenti devono essere comunicati con almeno **24 ore di anticipo**. In caso contrario, la seduta verrà regolarmente conteggiata.
+            """)
