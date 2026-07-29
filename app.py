@@ -11,11 +11,11 @@ st.set_page_config(
     layout="centered",
 )
 
-# Personalizzazione Stile CSS (Riquadro rosa)
+# Personalizzazione Stile CSS con riquadro rosa e campi bianchi
 st.markdown(
     """
     <style>
-    /* Sfondo rosa per il riquadro nativo di Streamlit */
+    /* Sfondo rosa per il riquadro nativo di Streamlit con bordo */
     div[data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #FCE4EC !important;
         padding: 15px !important;
@@ -23,8 +23,9 @@ st.markdown(
         border: 1px solid #F8BBD0 !important;
     }
     
-    /* Rende trasparenti i blocchi interni al contenitore rosa */
-    div[data-testid="stVerticalBlockBorderWrapper"] div {
+    /* Rende trasparenti i blocchi interni al contenitore rosa per far emergere il colore */
+    div[data-testid="stVerticalBlockBorderWrapper"] div[data-testid="stVerticalBlock"],
+    div[data-testid="stVerticalBlockBorderWrapper"] div[data-testid="stHorizontalBlock"] {
         background-color: transparent !important;
     }
     
@@ -268,7 +269,6 @@ if st.session_state["admin_logged_in"]:
 
   ora_sblocco = None
   if tipo_sblocco == "Orario specifico":
-    # Recupera gli orari effettivamente occupati/bloccati in quella data
     conn = sqlite3.connect("prenotazioni.db")
     c = conn.cursor()
     c.execute(
