@@ -11,32 +11,18 @@ st.set_page_config(
     layout="centered",
 )
 
-# Personalizzazione Stile CSS Avanzato
+# Stile CSS di base (senza forzature di colore sul box per stabilità)
 st.markdown(
     """
     <style>
-    /* 1. Sfondo rosa per il riquadro esterno */
-    [data-testid="stVerticalBlockBorderWrapper"] {
-        background-color: #FCE4EC !important;
-        padding: 15px !important;
-        border-radius: 16px !important;
-        border: 1px solid #F8BBD0 !important;
-    }
-    
-    /* 2. Rende trasparenti i blocchi interni al contenitore rosa */
-    [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stVerticalBlock"],
-    [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stHorizontalBlock"] {
-        background-color: transparent !important;
-    }
-    
-    /* 3. Campi di testo, selezioni e selettore data con sfondo bianco lucido */
+    /* Campi di testo, selezioni e selettore data con sfondo bianco */
     .stTextInput input, .stSelectbox > div > div, .stDateInput input {
         background-color: #FFFFFF !important;
         border-radius: 8px !important;
         border: 1px solid #E0E0E0 !important;
     }
     
-    /* 4. Pulsante di conferma rosa magenta */
+    /* Pulsante di conferma rosa magenta */
     div.stButton > button {
         background-color: #D81B60 !important;
         color: white !important;
@@ -195,14 +181,19 @@ else:
   with tab1:
     st.markdown("### Modulo di Prenotazione")
 
+    # CONTROLLO RESET CAMPI (eseguito prima di disegnare i widget)
+    if st.session_state.get("reset_form", False):
+      st.session_state["nome_input"] = ""
+      st.session_state["reset_form"] = False
+
     # Messaggio di conferma verde se presente
     if "booking_success_msg" in st.session_state:
       st.success(st.session_state["booking_success_msg"])
       del st.session_state["booking_success_msg"]
 
-    # RIQUADRO ROSA NATIVO
+    # RIQUADRO DI PRENOTAZIONE
     with st.container(border=True):
-      nome = st.text_input("Nome e Cognome *")
+      nome = st.text_input("Nome e Cognome *", key="nome_input")
       trattamento = st.selectbox(
           "Seleziona Trattamento / Lezione *",
           [
@@ -211,14 +202,15 @@ else:
               "Pilates Duetto (in coppia)",
               "Rieducazione Posturale Motorìa",
           ],
+          key="trattamento_input",
       )
 
-      # DATA ED ORA AFFIANCATE IN DUE COLONNE DENTRO IL BOX ROSA
+      # DATA ED ORA AFFIANCATE IN DUE COLONNE
       col1, col2 = st.columns(2)
 
       with col1:
         data_scelta = st.date_input(
-            "Seleziona Data *", min_value=datetime.today()
+            "Seleziona Data *", min_value=datetime.today(), key="data_input"
         )
 
       # Calcolo orari già occupati per la data selezionata
@@ -247,16 +239,21 @@ else:
 
       with col2:
         if orari_disponibili:
-          ora_scelta = st.selectbox("Seleziona Ora *", orari_disponibili)
+          ora_scelta = st.selectbox(
+              "Seleziona Ora *", orari_disponibili, key="ora_input"
+          )
         else:
           st.selectbox(
-              "Seleziona Ora *", ["Tutto occupato"], disabled=True, key="dis_ora"
+              "Seleziona Ora *",
+              ["Tutto occupato"],
+              disabled=True,
+              key="dis_ora_occupato",
           )
           ora_scelta = None
 
       submitted = st.button("Conferma Prenotazione", type="primary")
 
-    # Logica di salvataggio esterna al blocco grafico
+    # Logica di salvataggio
     if submitted:
       if not nome.strip():
         st.error("Per favore inserisci il tuo nome e cognome.")
@@ -296,11 +293,12 @@ else:
           # Formattazione data italiana (es. 29/07/2026)
           data_formattata = data_scelta.strftime("%d/%m/%Y")
 
-          # Salva il messaggio di successo e ricarica la pagina
+          # Messaggio di successo e attivazione flag di reset
           st.session_state["booking_success_msg"] = (
               f"🎉 PRENOTAZIONE CONFERMATA!\n\nGrazie {nome}, ti aspettiamo il"
               f" {data_formattata} alle ore {ora_scelta} per {trattamento}."
           )
+          st.session_state["reset_form"] = True
           st.rerun()
 
   # TAB 2: INFO STUDIO
@@ -318,7 +316,7 @@ else:
   # TAB 3: DOVE SIAMO
   with tab3:
     st.markdown("### 📍 Dove Siamo & Contatti")
-    st.write("📍 **Indirizzo:** Inserisci qui l'indirizzo dello studio")
+    st.write("📍 **Indirizzo:** Inserisci qui l'indizzo dello studio")
     st.write("📞 **Telefono / WhatsApp:** +39 333 0000000")
     st.write("✉️ **Email:** info@posturaepilates.it")
 
