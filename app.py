@@ -15,7 +15,7 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    /* Riquadro rosa nativo di Streamlit (border=True) */
+    /* 1. Sfondo rosa per il riquadro nativo di Streamlit */
     div[data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #FCE4EC !important;
         padding: 15px !important;
@@ -23,14 +23,19 @@ st.markdown(
         border: 1px solid #F8BBD0 !important;
     }
     
-    /* Campi di testo, selezioni e selettore data con sfondo bianco */
+    /* 2. Rimuove gli sfondi bianchi dei layer interni al box */
+    div[data-testid="stVerticalBlockBorderWrapper"] div {
+        background-color: transparent !important;
+    }
+    
+    /* 3. Campi di testo, selezioni e selettore data con sfondo bianco lucido */
     .stTextInput input, .stSelectbox > div > div, .stDateInput input {
         background-color: #FFFFFF !important;
         border-radius: 8px !important;
         border: 1px solid #E0E0E0 !important;
     }
     
-    /* Pulsante di conferma rosa magenta */
+    /* 4. Pulsante di conferma rosa magenta */
     div.stButton > button {
         background-color: #D81B60 !important;
         color: white !important;
@@ -194,7 +199,7 @@ else:
       st.success(st.session_state["booking_success_msg"])
       del st.session_state["booking_success_msg"]
 
-    # RIQUADRO ROSA NATIVO (Tutti i campi al suo interno)
+    # RIQUADRO ROSA NATIVO (Con campi all'interno e sfondo forzato)
     with st.container(border=True):
       nome = st.text_input("Nome e Cognome *")
       trattamento = st.selectbox(
