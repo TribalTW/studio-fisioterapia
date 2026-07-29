@@ -11,19 +11,19 @@ st.set_page_config(
     layout="centered",
 )
 
-# Stile CSS con forzatura mirata dello sfondo del riquadro
+# Personalizzazione Stile CSS (Riquadro rosa)
 st.markdown(
     """
     <style>
-    /* Forzatura assoluta dello sfondo rosa per il contenitore del modulo */
-    div.stVerticalBlockBorderWrapper, div[data-testid="stVerticalBlockBorderWrapper"] {
+    /* Sfondo rosa per il riquadro nativo di Streamlit */
+    div[data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #FCE4EC !important;
-        border: 1px solid #F8BBD0 !important;
+        padding: 15px !important;
         border-radius: 16px !important;
-        padding: 20px !important;
+        border: 1px solid #F8BBD0 !important;
     }
     
-    /* Rende trasparenti i blocchi interni al box rosa */
+    /* Rende trasparenti i blocchi interni al contenitore rosa */
     div[data-testid="stVerticalBlockBorderWrapper"] div {
         background-color: transparent !important;
     }
@@ -268,6 +268,7 @@ if st.session_state["admin_logged_in"]:
 
   ora_sblocco = None
   if tipo_sblocco == "Orario specifico":
+    # Recupera gli orari effettivamente occupati/bloccati in quella data
     conn = sqlite3.connect("prenotazioni.db")
     c = conn.cursor()
     c.execute(
