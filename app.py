@@ -15,8 +15,8 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    /* Riquadro rosa per il modulo di prenotazione */
-    [data-testid="stVerticalBlockBorderWrapper"] {
+    /* Sfondo rosa per il riquadro di prenotazione */
+    div[data-testid="stContainer"] {
         background-color: #FCE4EC !important;
         padding: 25px !important;
         border-radius: 16px !important;
@@ -194,7 +194,7 @@ else:
       st.success(st.session_state["booking_success_msg"])
       del st.session_state["booking_success_msg"]
 
-    # RIQUADRO ROSA DINAMICO
+    # RIQUADRO ROSA
     with st.container(border=True):
       nome = st.text_input("Nome e Cognome *")
       trattamento = st.selectbox(
@@ -291,7 +291,7 @@ else:
             # Formattazione data italiana (es. 29/07/2026)
             data_formattata = data_scelta.strftime("%d/%m/%Y")
 
-            # Salva il messaggio di successo senza toccare i widget key
+            # Salva il messaggio di successo e ricarica la pagina
             st.session_state["booking_success_msg"] = (
                 f"🎉 PRENOTAZIONE CONFERMATA!\n\nGrazie {nome}, ti aspettiamo il"
                 f" {data_formattata} alle ore {ora_scelta} per {trattamento}."
