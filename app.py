@@ -11,19 +11,19 @@ st.set_page_config(
     layout="centered",
 )
 
-# Personalizzazione Stile CSS (Riquadro rosa)
+# Stile CSS con forzatura mirata dello sfondo del riquadro rosa e campi bianchi
 st.markdown(
     """
     <style>
-    /* Sfondo rosa per il riquadro nativo di Streamlit */
-    div[data-testid="stVerticalBlockBorderWrapper"] {
+    /* Forzatura assoluta dello sfondo rosa per il contenitore del modulo */
+    div.stVerticalBlockBorderWrapper, div[data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #FCE4EC !important;
-        padding: 15px !important;
-        border-radius: 16px !important;
         border: 1px solid #F8BBD0 !important;
+        border-radius: 16px !important;
+        padding: 20px !important;
     }
     
-    /* Rende trasparenti i blocchi interni al contenitore rosa */
+    /* Rende trasparenti i blocchi interni al box rosa */
     div[data-testid="stVerticalBlockBorderWrapper"] div {
         background-color: transparent !important;
     }
@@ -154,16 +154,20 @@ if st.session_state["admin_logged_in"]:
     st.info("Nessuna prenotazione presente nel database.")
 
   st.markdown("---")
-  st.subheader("🔒 Gestione Chiusure / Blocchi Studio")
+  st.subheader("🔒 Gestione Chiusure / Blocchi Studio (anche a intervallo)")
   st.write(
-      "Seleziona una data per bloccare l'intera giornata o un orario"
-      " specifico."
+      "Seleziona un giorno o un intervallo di date per bloccare l'intera"
+      " giornata o un orario specifico."
   )
 
   col_b1, col_b2 = st.columns(2)
   with col_b1:
+    # Usando una tupla come valore iniziale, Streamlit abilita la selezione dell'intervallo di date
     data_blocco = st.date_input(
-        "Data da gestire", min_value=datetime.today(), key="data_blocco_input"
+        "Data o Intervallo da gestire",
+        value=(datetime.today(), datetime.today()),
+        min_value=datetime.today(),
+        key="data_blocco_input",
     )
   with col_b2:
     tipo_blocco = st.radio(
@@ -195,67 +199,74 @@ if st.session_state["admin_logged_in"]:
     conn = sqlite3.connect("prenotazioni.db")
     c = conn.cursor()
 
-    if tipo_blocco == "Tutta la giornata":
-      for h in TUTTI_GLI_ORARI_ADMIN:
+    # Gestione singola data o intervallo di date
+    if isinstance(data_blocco, tuple):
+      if len(data_blocco) == 2:
+        lista_date = pd.date_range(
+            start=data_blocco[0], end=data_blocco[1]
+        ).strftime("%Y-%m-%d")
+      elif len(data_blocco) == 1:
+        lista_date = [str(data_blocco[0])]
+      else:
+        lista_date = []
+    else:
+      lista_date = [str(data_blocco)]
+
+    for d_str in lista_date:
+      if tipo_blocco == "Tutta la giornata":
+        for h in TUTTI_GLI_ORARI_ADMIN:
+          c.execute(
+              "SELECT id FROM prenotazioni WHERE data = ? AND ora = ?",
+              (d_str, h),
+          )
+          if not c.fetchone():
+            c.execute(
+                "INSERT INTO prenotazioni (nome, data, ora, trattamento,"
+                " data_creazione) VALUES (?, ?, ?, ?, ?)",
+                (
+                    "🔒 STUDIO CHIUSO",
+                    d_str,
+                    h,
+                    "Chiusura Admin",
+                    datetime.now().strftime("%Y-%m-%d %H:%M"),
+                ),
+            )
+      else:
         c.execute(
             "SELECT id FROM prenotazioni WHERE data = ? AND ora = ?",
-            (str(data_blocco), h),
+            (d_str, ora_blocco),
         )
         if not c.fetchone():
           c.execute(
               "INSERT INTO prenotazioni (nome, data, ora, trattamento,"
               " data_creazione) VALUES (?, ?, ?, ?, ?)",
               (
-                  "🔒 STUDIO CHIUSO",
-                  str(data_blocco),
-                  h,
+                  "🔒 ORARIO CHIUSO",
+                  d_str,
+                  ora_blocco,
                   "Chiusura Admin",
                   datetime.now().strftime("%Y-%m-%d %H:%M"),
               ),
           )
-      st.success(
-          f"Intera giornata del {data_blocco.strftime('%d/%m/%Y')}"
-          " bloccata/chiusa con successo!"
-      )
-    else:
-      c.execute(
-          "SELECT id FROM prenotazioni WHERE data = ? AND ora = ?",
-          (str(data_blocco), ora_blocco),
-      )
-      if c.fetchone():
-        st.warning("Questo orario risulta già occupato o bloccato.")
-      else:
-        c.execute(
-            "INSERT INTO prenotazioni (nome, data, ora, trattamento,"
-            " data_creazione) VALUES (?, ?, ?, ?, ?)",
-            (
-                "🔒 ORARIO CHIUSO",
-                str(data_blocco),
-                ora_blocco,
-                "Chiusura Admin",
-                datetime.now().strftime("%Y-%m-%d %H:%M"),
-            ),
-        )
-        st.success(
-            f"Orario {ora_blocco} del {data_blocco.strftime('%d/%m/%Y')}"
-            " bloccato con successo!"
-        )
 
     conn.commit()
     conn.close()
+    st.success("Blocco applicato con successo per le date selezionate!")
     st.rerun()
 
-  # SEZIONE SBLOCCO SPECULARE AL BLOCCO
+  # SEZIONE SBLOCCO SPECULARE CON INTERVALLO
   st.markdown("---")
-  st.subheader("🔓 Gestione Sblocchi Studio")
+  st.subheader("🔓 Gestione Sblocchi Studio (anche a intervallo)")
   st.write(
-      "Seleziona una data per sbloccare l'intera giornata o un singolo orario."
+      "Seleziona un giorno o un intervallo di date da sbloccare in un solo"
+      " colpo."
   )
 
   col_s1, col_s2 = st.columns(2)
   with col_s1:
     data_sblocco = st.date_input(
-        "Data da sbloccare",
+        "Data o Intervallo da sbloccare",
+        value=(datetime.today(), datetime.today()),
         min_value=datetime.today(),
         key="data_sblocco_input",
     )
@@ -268,12 +279,16 @@ if st.session_state["admin_logged_in"]:
 
   ora_sblocco = None
   if tipo_sblocco == "Orario specifico":
-    # Recupera gli orari effettivamente occupati/bloccati in quella data
     conn = sqlite3.connect("prenotazioni.db")
     c = conn.cursor()
+    # Se viene selezionato un intervallo, mostra gli orari occupati del primo giorno o generali
+    data_rif = (
+        data_sblocco[0]
+        if isinstance(data_sblocco, tuple)
+        else str(data_sblocco)
+    )
     c.execute(
-        "SELECT ora, nome FROM prenotazioni WHERE data = ?",
-        (str(data_sblocco),),
+        "SELECT DISTINCT ora FROM prenotazioni WHERE data = ?", (str(data_rif),)
     )
     slot_occupati = c.fetchall()
     conn.close()
@@ -286,34 +301,39 @@ if st.session_state["admin_logged_in"]:
           key="ora_sblocco_input",
       )
     else:
-      st.info("Nessun orario occupato o bloccato in questa data.")
+      st.info(
+          "Nessun orario occupato o bloccato trovato per la data di riferimento."
+      )
 
   if st.button("Conferma Sblocco Studio"):
     conn = sqlite3.connect("prenotazioni.db")
     c = conn.cursor()
 
-    if tipo_sblocco == "Tutta la giornata":
-      c.execute("DELETE FROM prenotazioni WHERE data = ?", (str(data_sblocco),))
-      st.success(
-          f"Tutti gli impegni e chiusure del"
-          f" {data_sblocco.strftime('%d/%m/%Y')} sono stati rimossi e"
-          " sbloccati!"
-      )
-    else:
-      if ora_sblocco:
-        c.execute(
-            "DELETE FROM prenotazioni WHERE data = ? AND ora = ?",
-            (str(data_sblocco), ora_sblocco),
-        )
-        st.success(
-            f"Orario {ora_sblocco} del {data_sblocco.strftime('%d/%m/%Y')}"
-            " sbloccato con successo!"
-        )
+    if isinstance(data_sblocco, tuple):
+      if len(data_sblocco) == 2:
+        lista_date_sblocco = pd.date_range(
+            start=data_sblocco[0], end=data_sblocco[1]
+        ).strftime("%Y-%m-%d")
+      elif len(data_sblocco) == 1:
+        lista_date_sblocco = [str(data_sblocco[0])]
       else:
-        st.warning("Nessun orario valido selezionato da sbloccare.")
+        lista_date_sblocco = []
+    else:
+      lista_date_sblocco = [str(data_sblocco)]
+
+    for d_str in lista_date_sblocco:
+      if tipo_sblocco == "Tutta la giornata":
+        c.execute("DELETE FROM prenotazioni WHERE data = ?", (d_str,))
+      else:
+        if ora_sblocco:
+          c.execute(
+              "DELETE FROM prenotazioni WHERE data = ? AND ora = ?",
+              (d_str, ora_sblocco),
+          )
 
     conn.commit()
     conn.close()
+    st.success("Sblocco applicato con successo per le date selezionate!")
     st.rerun()
 
 
