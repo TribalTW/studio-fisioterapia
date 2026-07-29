@@ -11,10 +11,23 @@ st.set_page_config(
     layout="centered",
 )
 
-# Stile CSS di base (senza forzature di colore sul box per stabilità)
+# Personalizzazione Stile CSS (Riquadro rosa ripristinato)
 st.markdown(
     """
     <style>
+    /* Sfondo rosa per il riquadro nativo di Streamlit */
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        background-color: #FCE4EC !important;
+        padding: 15px !important;
+        border-radius: 16px !important;
+        border: 1px solid #F8BBD0 !important;
+    }
+    
+    /* Rende trasparenti i blocchi interni al contenitore rosa */
+    div[data-testid="stVerticalBlockBorderWrapper"] div {
+        background-color: transparent !important;
+    }
+    
     /* Campi di testo, selezioni e selettore data con sfondo bianco */
     .stTextInput input, .stSelectbox > div > div, .stDateInput input {
         background-color: #FFFFFF !important;
@@ -137,25 +150,118 @@ if st.session_state["admin_logged_in"]:
 
   if not df.empty:
     st.dataframe(df, use_container_width=True)
-
-    st.markdown("---")
-    st.subheader("🗑️ Elimina / Annulla Prenotazione")
-    id_da_eliminare = st.number_input(
-        "Inserisci l'ID della prenotazione da cancellare:", min_value=1, step=1
-    )
-    if st.button("Elimina Prenotazione"):
-      conn = sqlite3.connect("prenotazioni.db")
-      c = conn.cursor()
-      c.execute("DELETE FROM prenotazioni WHERE id = ?", (id_da_eliminare,))
-      conn.commit()
-      conn.close()
-      st.success(
-          f"Prenotazione ID {id_da_eliminare} eliminata! L'orario è di nuovo"
-          " libero."
-      )
-      st.rerun()
   else:
     st.info("Nessuna prenotazione presente nel database.")
+
+  st.markdown("---")
+  st.subheader("🔒 Gestione Chiusure / Blocchi Studio")
+  st.write(
+      "Seleziona una data per bloccare l'intera giornata o un orario"
+      " specifico."
+  )
+
+  col_b1, col_b2 = st.columns(2)
+  with col_b1:
+    data_blocco = st.date_input(
+        "Data da gestire", min_value=datetime.today(), key="data_blocco_input"
+    )
+  with col_b2:
+    tipo_blocco = st.radio(
+        "Tipo di blocco",
+        ["Tutta la giornata", "Orario specifico"],
+        key="tipo_blocco_input",
+    )
+
+  ora_blocco = None
+  TUTTI_GLI_ORARI_ADMIN = [
+      "08:00",
+      "09:00",
+      "10:00",
+      "11:00",
+      "15:00",
+      "16:00",
+      "17:00",
+      "18:00",
+      "19:00",
+  ]
+  if tipo_blocco == "Orario specifico":
+    ora_blocco = st.selectbox(
+        "Seleziona Orario da bloccare",
+        TUTTI_GLI_ORARI_ADMIN,
+        key="ora_blocco_input",
+    )
+
+  if st.button("Conferma Blocco Studio"):
+    conn = sqlite3.connect("prenotazioni.db")
+    c = conn.cursor()
+
+    if tipo_blocco == "Tutta la giornata":
+      for h in TUTTI_GLI_ORARI_ADMIN:
+        c.execute(
+            "SELECT id FROM prenotazioni WHERE data = ? AND ora = ?",
+            (str(data_blocco), h),
+        )
+        if not c.fetchone():
+          c.execute(
+              "INSERT INTO prenotazioni (nome, data, ora, trattamento,"
+              " data_creazione) VALUES (?, ?, ?, ?, ?)",
+              (
+                  "🔒 STUDIO CHIUSO",
+                  str(data_blocco),
+                  h,
+                  "Chiusura Admin",
+                  datetime.now().strftime("%Y-%m-%d %H:%M"),
+              ),
+          )
+      st.success(
+          f"Intera giornata del {data_blocco.strftime('%d/%m/%Y')}"
+          " bloccata/chiusa con successo!"
+      )
+    else:
+      c.execute(
+          "SELECT id FROM prenotazioni WHERE data = ? AND ora = ?",
+          (str(data_blocco), ora_blocco),
+      )
+      if c.fetchone():
+        st.warning("Questo orario risulta già occupato o bloccato.")
+      else:
+        c.execute(
+            "INSERT INTO prenotazioni (nome, data, ora, trattamento,"
+            " data_creazione) VALUES (?, ?, ?, ?, ?)",
+            (
+                "🔒 ORARIO CHIUSO",
+                str(data_blocco),
+                ora_blocco,
+                "Chiusura Admin",
+                datetime.now().strftime("%Y-%m-%d %H:%M"),
+            ),
+        )
+        st.success(
+            f"Orario {ora_blocco} del {data_blocco.strftime('%d/%m/%Y')}"
+            " bloccato con successo!"
+        )
+
+    conn.commit()
+    conn.close()
+    st.rerun()
+
+  st.markdown("---")
+  st.subheader("🗑️ Elimina / Sblocca Prenotazione o Chiusura")
+  id_da_eliminare = st.number_input(
+      "Inserisci l'ID della prenotazione o del blocco da cancellare:",
+      min_value=1,
+      step=1,
+  )
+  if st.button("Elimina / Sblocca"):
+    conn = sqlite3.connect("prenotazioni.db")
+    c = conn.cursor()
+    c.execute("DELETE FROM prenotazioni WHERE id = ?", (id_da_eliminare,))
+    conn.commit()
+    conn.close()
+    st.success(
+        f"Elemento ID {id_da_eliminare} rimosso! L'orario è di nuovo disponibile."
+    )
+    st.rerun()
 
 
 # --- VISTA 2: PAGINA PRINCIPALE CLIENTE ---
@@ -181,17 +287,17 @@ else:
   with tab1:
     st.markdown("### Modulo di Prenotazione")
 
-    # CONTROLLO RESET CAMPI (eseguito prima di disegnare i widget)
-    if st.session_state.get("reset_form", False):
+    # RESET SELETTIVO: Pulisce solo il nome dopo la conferma
+    if st.session_state.get("reset_nome_flag", False):
       st.session_state["nome_input"] = ""
-      st.session_state["reset_form"] = False
+      st.session_state["reset_nome_flag"] = False
 
     # Messaggio di conferma verde se presente
     if "booking_success_msg" in st.session_state:
       st.success(st.session_state["booking_success_msg"])
       del st.session_state["booking_success_msg"]
 
-    # RIQUADRO DI PRENOTAZIONE
+    # RIQUADRO ROSA NATIVO
     with st.container(border=True):
       nome = st.text_input("Nome e Cognome *", key="nome_input")
       trattamento = st.selectbox(
@@ -213,7 +319,7 @@ else:
             "Seleziona Data *", min_value=datetime.today(), key="data_input"
         )
 
-      # Calcolo orari già occupati per la data selezionata
+      # Calcolo orari già occupati o bloccati per la data selezionata
       conn = sqlite3.connect("prenotazioni.db")
       c = conn.cursor()
       c.execute(
@@ -293,12 +399,12 @@ else:
           # Formattazione data italiana (es. 29/07/2026)
           data_formattata = data_scelta.strftime("%d/%m/%Y")
 
-          # Messaggio di successo e attivazione flag di reset
+          # Messaggio di successo e attivazione flag per pulire solo il nome
           st.session_state["booking_success_msg"] = (
               f"🎉 PRENOTAZIONE CONFERMATA!\n\nGrazie {nome}, ti aspettiamo il"
               f" {data_formattata} alle ore {ora_scelta} per {trattamento}."
           )
-          st.session_state["reset_form"] = True
+          st.session_state["reset_nome_flag"] = True
           st.rerun()
 
   # TAB 2: INFO STUDIO
@@ -316,7 +422,7 @@ else:
   # TAB 3: DOVE SIAMO
   with tab3:
     st.markdown("### 📍 Dove Siamo & Contatti")
-    st.write("📍 **Indirizzo:** Inserisci qui l'indizzo dello studio")
+    st.write("📍 **Indirizzo:** Inserisci qui l'indirizzo dello studio")
     st.write("📞 **Telefono / WhatsApp:** +39 333 0000000")
     st.write("✉️ **Email:** info@posturaepilates.it")
 
