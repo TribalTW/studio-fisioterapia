@@ -1,6 +1,7 @@
 from datetime import datetime
 import os
 import sqlite3
+from zoneinfo import ZoneInfo
 import pandas as pd
 import streamlit as st
 
@@ -11,7 +12,7 @@ st.set_page_config(
     layout="centered",
 )
 
-# Stile CSS con pulsanti secondari in verde chiaro e riquadro rosa
+# Stile CSS con riquadro rosa e pulsanti rosa magenta originali
 st.markdown(
     """
     <style>
@@ -35,37 +36,21 @@ st.markdown(
         border: 1px solid #E0E0E0 !important;
     }
     
-    /* Pulsante principale di conferma (Rosa Magenta) */
-    div.stButton > button[kind="primary"] {
+    /* Pulsanti in rosa magenta originale */
+    div.stButton > button {
         background-color: #D81B60 !important;
         color: white !important;
         border-radius: 10px !important;
-        font-size: 1.1rem !important;
-        font-weight: bold !important;
-        border: none !important;
-        width: 100% !important;
-        padding: 12px 20px !important;
-        margin-top: 10px !important;
-    }
-    div.stButton > button[kind="primary"]:hover {
-        background-color: #C2185B !important;
-    }
-
-    /* Pulsanti secondari (Sblocca, Sbanna, Elimina, ecc. in Verde Chiaro) */
-    div.stButton > button:not([kind="primary"]) {
-        background-color: #C8E6C9 !important;
-        color: #2E7D32 !important;
-        border-radius: 10px !important;
         font-size: 1rem !important;
         font-weight: bold !important;
-        border: 1px solid #A5D6A7 !important;
+        border: none !important;
         width: 100% !important;
         padding: 10px 20px !important;
         margin-top: 5px !important;
     }
-    div.stButton > button:not([kind="primary"]):hover {
-        background-color: #A5D6A7 !important;
-        color: #1B5E20 !important;
+    
+    div.stButton > button:hover {
+        background-color: #C2185B !important;
     }
     
     /* Titoli in rosa scuro */
@@ -235,7 +220,7 @@ if st.session_state["admin_logged_in"]:
 
   col_btn1, col_btn2 = st.columns(2)
   with col_btn1:
-    btn_blocca = st.button("🔒 Blocca Selezionati", type="primary")
+    btn_blocca = st.button("🔒 Blocca Selezionati")
   with col_btn2:
     btn_sblocca = st.button("🔓 Sblocca Selezionati")
 
@@ -486,8 +471,13 @@ else:
             "19:00",
         ]
 
-        # Filtra gli orari escludendo quelli passati se la data scelta è oggi
-        current_datetime = datetime.now()
+        # Ottiene l'orario attuale italiano (gestisce correttamente il fuso orario)
+        try:
+          local_tz = ZoneInfo("Europe/Rome")
+          current_datetime = datetime.now(local_tz)
+        except Exception:
+          current_datetime = datetime.now()
+
         current_date = current_datetime.date()
         current_time = current_datetime.time()
 
@@ -515,9 +505,7 @@ else:
             )
             ora_scelta = None
 
-        submitted = st.button(
-            "Conferma Prenotazione", type="primary"
-        )  # Pulsante principale Rosa
+        submitted = st.button("Conferma Prenotazione")
 
       # Logica di salvataggio con salvataggio IP
       if submitted:
