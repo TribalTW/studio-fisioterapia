@@ -17,6 +17,11 @@ st.set_page_config(
 st.markdown(
     """
     <style>
+    /* Sfondo principale dell'intera applicazione */
+    .stApp {
+        background-color: #FAF0F5 !important;
+    }
+    
     /* Forzatura assoluta dello sfondo rosa per il contenitore del modulo */
     div.stVerticalBlockBorderWrapper, div[data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #FCE4EC !important;
