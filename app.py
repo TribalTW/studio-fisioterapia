@@ -5,7 +5,6 @@ import uuid
 from zoneinfo import ZoneInfo
 import pandas as pd
 import streamlit as st
-from streamlit_cookies_controller import CookieController
 
 # Configurazione Pagina
 st.set_page_config(
@@ -13,9 +12,6 @@ st.set_page_config(
     page_icon="🧘‍♀️",
     layout="centered",
 )
-
-# Inizializzazione Controller Cookie per persistenza reale del dispositivo
-controller = CookieController()
 
 # Stile CSS con riquadro personalizzato (#fca4c3) sia per il cliente che per l'admin
 st.markdown(
@@ -110,13 +106,11 @@ def init_db():
 init_db()
 
 
-# Funzione avanzata per ricavare l'identificativo client tramite Cookie persistenti
+# Identificazione dispositivo blindata tramite parametri URL persistenti
 def get_client_ip():
-  device_id = controller.get("client_unique_id")
-  if not device_id:
-    device_id = str(uuid.uuid4())[:12]
-    controller.set("client_unique_id", device_id, max_age=365 * 24 * 60 * 60)
-  return f"browser_cookie_{device_id}"
+  if "dev_id" not in st.query_params or not st.query_params["dev_id"].strip():
+    st.query_params["dev_id"] = str(uuid.uuid4())[:8]
+  return f"device_{st.query_params['dev_id']}"
 
 
 # Cerca se esiste il file del logo
@@ -421,8 +415,8 @@ else:
 
   if is_banned:
     st.error(
-        "⛔ Accesso negato: il tuo indirizzo IP è stato bloccato per violazione"
-        " delle regole del servizio."
+        "⛔ Accesso negato: questo dispositivo è stato bloccato per"
+        " violazione delle regole del servizio."
     )
   else:
     if logo_path:
