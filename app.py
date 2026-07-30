@@ -314,7 +314,7 @@ if st.session_state["admin_logged_in"]:
       conn.close()
       st.rerun()
 
-  # 3. SEZIONE: ELIMINAZIONE SINGOLA, BAN IP E BLACKLIST
+  # 3. SEZIONE: ELIMINAZIONE SINGOLA, BAN MIRATO E BLACKLIST
   with st.container(border=True):
     st.subheader("🛡️ Gestione Spam, Sicurezza e Blacklist")
 
@@ -340,30 +340,55 @@ if st.session_state["admin_logged_in"]:
           st.rerun()
 
     with col_sec2:
-      st.markdown("##### Ban Indirizzo IP / Dispositivo")
-      ip_da_bannare = st.text_input(
-          "Inserisci Indirizzo IP da bannare", key="ip_ban_input"
+      st.markdown("##### Banna Utente Individuale")
+      conn_b = sqlite3.connect("prenotazioni.db")
+      df_prenotazioni_attive = pd.read_sql_query(
+          "SELECT id, nome, trattamento, ip FROM prenotazioni WHERE ip !="
+          " 'SYSTEM'",
+          conn_b,
       )
-      if st.button("Banna Indirizzo IP"):
-        if ip_da_bannare.strip():
+      conn_b.close()
+
+      if not df_prenotazioni_attive.empty:
+        df_prenotazioni_attive["label"] = (
+            df_prenotazioni_attive["id"].astype(str)
+            + " - "
+            + df_prenotazioni_attive["nome"]
+            + " ("
+            + df_prenotazioni_attive["trattamento"]
+            + ")"
+        )
+        scelta_ban = st.selectbox(
+            "Seleziona utente/prenotazione da bannare",
+            df_prenotazioni_attive["label"].tolist(),
+            key="seleziona_ban_input",
+        )
+        if st.button("Banna Utente Selezionato"):
+          id_selezionato = int(scelta_ban.split(" - ")[0])
           conn = sqlite3.connect("prenotazioni.db")
           c = conn.cursor()
-          try:
+          c.execute("SELECT ip FROM prenotazioni WHERE id = ?", (id_selezionato,))
+          res = c.fetchone()
+          if res and res[0]:
+            ip_da_bannare = res[0]
             c.execute(
                 "INSERT OR IGNORE INTO banned_ips (ip) VALUES (?)",
-                (ip_da_bannare.strip(),),
+                (ip_da_bannare,),
             )
             conn.commit()
             st.success(
-                f"L'IP {ip_da_bannare} è stato inserito nella blacklist."
+                f"L'utente associato alla prenotazione #{id_selezionato}"
+                f" (Dispositivo: {ip_da_bannare}) è stato bannato con successo!"
             )
-          except Exception as e:
-            st.error(f"Errore: {e}")
-          finally:
-            conn.close()
+          conn.close()
           st.rerun()
+      else:
+        st.info(
+            "Nessuna prenotazione disponibile da cui ricavare l'utente da"
+            " bannare."
+        )
 
-    st.markdown("##### 📋 Blacklist IP & Nominativi Associati")
+    st.markdown("##### 📋 Blacklist Dispositivi & Nominativi Associati")
     conn = sqlite3.connect("prenotazioni.db")
     df_banned = pd.read_sql_query(
         """
@@ -380,20 +405,20 @@ if st.session_state["admin_logged_in"]:
     if not df_banned.empty:
       st.dataframe(df_banned, use_container_width=True)
       ip_da_sbannare = st.selectbox(
-          "Seleziona IP da rimuovere dalla blacklist",
+          "Seleziona Dispositivo/IP da rimuovere dalla blacklist",
           df_banned["ip"].tolist(),
           key="sbianca_ip",
       )
-      if st.button("Rimuovi Ban (Sbanna IP)"):
+      if st.button("Rimuovi Ban (Sbanna)"):
         conn = sqlite3.connect("prenotazioni.db")
         c = conn.cursor()
         c.execute("DELETE FROM banned_ips WHERE ip = ?", (ip_da_sbannare,))
         conn.commit()
         conn.close()
-        st.success(f"IP {ip_da_sbannare} rimosso dalla blacklist con successo!")
+        st.success(f"Dispositivo rimosso dalla blacklist con successo!")
         st.rerun()
     else:
-      st.info("Nessun IP presente nella blacklist.")
+      st.info("Nessun dispositivo presente nella blacklist.")
 
 
 # --- VISTA 2: PAGINA PRINCIPALE CLIENTE ---
