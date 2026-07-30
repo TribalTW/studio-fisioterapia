@@ -13,11 +13,10 @@ st.set_page_config(
     layout="centered",
 )
 
-# Stile CSS e Script JavaScript per l'auto-aggiornamento alla riapertura della scheda
+# Stile CSS e Script JavaScript avanzato (LocalStorage + Auto-refresh)
 st.markdown(
     """
     <style>
-    /* Forzatura assoluta dello sfondo per tutti i contenitori con bordo */
     div.stVerticalBlockBorderWrapper, div[data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #fca4c3 !important;
         border: 1px solid #e882a4 !important;
@@ -64,13 +63,30 @@ st.markdown(
     footer {visibility: hidden;}
     </style>
 
-    <!-- Script JavaScript: ricarica la pagina automaticamente non appena l'utente riapre la scheda o torna sull'app -->
+    <!-- Script JavaScript Definitivo: gestisce localStorage per nuove schede e auto-refresh -->
     <script>
-    document.addEventListener("visibilitychange", function() {
-        if (document.visibilityState === "visible") {
-            location.reload();
+    (function() {
+        // 1. Gestione ID Persistente tramite LocalStorage (funziona anche aprendo nuove schede o link salvati)
+        let deviceId = localStorage.getItem('persistent_device_id');
+        if (!deviceId) {
+            deviceId = 'dev_' + Math.random().toString(36).substring(2, 12);
+            localStorage.setItem('persistent_device_id', deviceId);
         }
-    });
+
+        // 2. Forza l'URL ad avere sempre il dev_id corretto della memoria del browser
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('dev_id') !== deviceId) {
+            urlParams.set('dev_id', deviceId);
+            window.location.replace(window.location.pathname + '?' + urlParams.toString());
+        }
+
+        // 3. Ricarica automatica della pagina quando l'utente torna sulla scheda (da background a primo piano)
+        document.addEventListener("visibilitychange", function() {
+            if (document.visibilityState === "visible") {
+                location.reload();
+            }
+        });
+    })();
     </script>
 """,
     unsafe_allow_html=True,
@@ -109,7 +125,7 @@ def init_db():
 init_db()
 
 
-# Identificazione dispositivo blindata tramite parametri URL persistenti
+# Identificazione dispositivo blindata tramite parametri URL sincronizzati con localStorage
 def get_client_ip():
   if "dev_id" not in st.query_params or not st.query_params["dev_id"].strip():
     st.query_params["dev_id"] = str(uuid.uuid4())[:8]
@@ -551,7 +567,6 @@ else:
         submitted = st.button("Conferma Prenotazione")
 
       if submitted:
-        # Controllo di sicurezza extra al momento del click (anti-furbetti)
         conn_check = sqlite3.connect("prenotazioni.db")
         c_check = conn_check.cursor()
         c_check.execute("SELECT ip FROM banned_ips WHERE ip = ?", (client_ip,))
