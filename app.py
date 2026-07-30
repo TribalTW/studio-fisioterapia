@@ -13,15 +13,15 @@ st.set_page_config(
     layout="centered",
 )
 
-# Stile CSS con riquadro rosa e pulsanti rosa magenta originali
+# Stile CSS con sfondo principale personalizzato (#f7dae4), riquadro rosa e pulsanti rosa magenta originali
 st.markdown(
     """
     <style>
     /* Sfondo principale dell'intera applicazione */
     .stApp {
-        background-color: #F7DAE4 !important;
+        background-color: #f7dae4 !important;
     }
-    
+
     /* Forzatura assoluta dello sfondo rosa per il contenitore del modulo */
     div.stVerticalBlockBorderWrapper, div[data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #FCE4EC !important;
