@@ -1,7 +1,6 @@
 from datetime import datetime
 import os
 import sqlite3
-import uuid
 from zoneinfo import ZoneInfo
 import pandas as pd
 import streamlit as st
@@ -63,7 +62,7 @@ st.markdown(
     footer {visibility: hidden;}
     </style>
 
-    <!-- Script JavaScript: sincronizza LocalStorage con l'URL ed esegue l'auto-refresh alla riapertura della scheda -->
+    <!-- Script JavaScript: legge LocalStorage e sincronizza istantaneamente l'URL -->
     <script>
     (function() {
         let deviceId = localStorage.getItem('persistent_device_id');
@@ -122,13 +121,23 @@ def init_db():
 
 init_db()
 
+# --- BLOCCO DI SICUREZZA PREVENTIVO ---
+# Attende che JavaScript sincronizzi il LocalStorage nell'URL prima di caricare l'app
+if "dev_id" not in st.query_params or not st.query_params["dev_id"].strip():
+  st.markdown(
+      """
+        <div style="text-align: center; margin-top: 100px;">
+            <h3>Caricamento in corso... 🧘‍♀️</h3>
+            <p>Verifica sicurezza dispositivo in corso...</p>
+        </div>
+    """,
+      unsafe_allow_html=True,
+  )
+  st.stop()
 
-# Identificazione dispositivo: se manca il dev_id, genera un ID univoco isolato per sessione
+
+# Identificazione dispositivo blindata basata esclusivamente sul LocalStorage
 def get_client_ip():
-  if "dev_id" not in st.query_params or not st.query_params["dev_id"].strip():
-    if "fallback_dev_id" not in st.session_state:
-      st.session_state["fallback_dev_id"] = str(uuid.uuid4())[:8]
-    return f"device_{st.session_state['fallback_dev_id']}"
   return f"device_{st.query_params['dev_id']}"
 
 
