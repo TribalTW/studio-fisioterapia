@@ -1,6 +1,7 @@
 from datetime import datetime
 import os
 import sqlite3
+import uuid
 from zoneinfo import ZoneInfo
 import pandas as pd
 import streamlit as st
@@ -66,7 +67,7 @@ st.markdown(
 )
 
 
-# Inizializzazione Database SQLite
+# Inizializzazione Database SQLite con supporto Device ID e Blacklist
 def init_db():
   conn = sqlite3.connect("prenotazioni.db")
   c = conn.cursor()
@@ -77,7 +78,18 @@ def init_db():
             data TEXT NOT NULL,
             ora TEXT NOT NULL,
             trattamento TEXT NOT NULL,
-            data_creazione TEXT NOT NULL
+            data_creazione TEXT NOT NULL,
+            device_id TEXT
+        )
+    """)
+  try:
+    c.execute("ALTER TABLE prenotazioni ADD COLUMN device_id TEXT")
+  except sqlite3.OperationalError:
+    pass
+
+  c.execute("""
+        CREATE TABLE IF NOT EXISTS banned_devices (
+            device_id TEXT PRIMARY KEY
         )
     """)
   conn.commit()
@@ -85,6 +97,15 @@ def init_db():
 
 
 init_db()
+
+
+# Identificazione univoca del singolo dispositivo tramite parametri URL nativi
+def get_client_device_id():
+  if "dev_id" not in st.query_params or not st.query_params["dev_id"].strip():
+    st.query_params["dev_id"] = uuid.uuid4().hex[:10]
+    st.rerun()
+  return f"device_{st.query_params['dev_id']}"
+
 
 # Cerca se esiste il file del logo
 logo_path = None
@@ -139,7 +160,7 @@ if st.session_state["admin_logged_in"]:
     st.subheader("📋 Elenco Prenotazioni")
     conn = sqlite3.connect("prenotazioni.db")
     df = pd.read_sql_query(
-        "SELECT id, nome, data, ora, trattamento, data_creazione FROM"
+        "SELECT id, nome, data, ora, trattamento, data_creazione, device_id FROM"
         " prenotazioni ORDER BY data DESC, ora ASC",
         conn,
     )
@@ -223,13 +244,14 @@ if st.session_state["admin_logged_in"]:
               if not c.fetchone():
                 c.execute(
                     "INSERT INTO prenotazioni (nome, data, ora, trattamento,"
-                    " data_creazione) VALUES (?, ?, ?, ?, ?)",
+                    " data_creazione, device_id) VALUES (?, ?, ?, ?, ?, ?)",
                     (
                         "🔒 STUDIO CHIUSO",
                         d_str,
                         h,
                         "Chiusura Admin",
                         datetime.now().strftime("%Y-%m-%d %H:%M"),
+                        "SYSTEM",
                     ),
                 )
           else:
@@ -240,13 +262,14 @@ if st.session_state["admin_logged_in"]:
             if not c.fetchone():
               c.execute(
                   "INSERT INTO prenotazioni (nome, data, ora, trattamento,"
-                  " data_creazione) VALUES (?, ?, ?, ?, ?)",
+                  " data_creazione, device_id) VALUES (?, ?, ?, ?, ?, ?)",
                   (
                       "🔒 ORARIO CHIUSO",
                       d_str,
                       ora_intervallo,
                       "Chiusura Admin",
                       datetime.now().strftime("%Y-%m-%d %H:%M"),
+                      "SYSTEM",
                   ),
               )
         st.success("Blocco applicato con successo per le date selezionate!")
@@ -267,242 +290,375 @@ if st.session_state["admin_logged_in"]:
       conn.close()
       st.rerun()
 
-  # 3. SEZIONE: ELIMINAZIONE PRENOTAZIONE SINGOLA
+  # 3. SEZIONE: ELIMINAZIONE SINGOLA, BAN MIRATO E BLACKLIST
   with st.container(border=True):
-    st.subheader("🗑️ Gestione ed Eliminazione Prenotazioni")
-    id_da_eliminare = st.number_input(
-        "ID Prenotazione da eliminare", min_value=0, step=1, key="id_elimina_input"
+    st.subheader("🛡️ Gestione Spam, Sicurezza e Blacklist")
+
+    col_sec1, col_sec2 = st.columns(2)
+    with col_sec1:
+      st.markdown("##### Elimina Prenotazione Singola")
+      id_da_eliminare = st.number_input(
+          "ID Prenotazione da eliminare",
+          min_value=0,
+          step=1,
+          key="id_elimina_input",
+      )
+      if st.button("Elimina Singola Prenotazione"):
+        if id_da_eliminare > 0:
+          conn = sqlite3.connect("prenotazioni.db")
+          c = conn.cursor()
+          c.execute("DELETE FROM prenotazioni WHERE id = ?", (id_da_eliminare,))
+          conn.commit()
+          conn.close()
+          st.success(
+              f"Prenotazione con ID {id_da_eliminare} eliminata con successo!"
+          )
+          st.rerun()
+
+    with col_sec2:
+      st.markdown("##### Banna Utente Individuale")
+      conn_b = sqlite3.connect("prenotazioni.db")
+      df_prenotazioni_attive = pd.read_sql_query(
+          "SELECT id, nome, trattamento, device_id FROM prenotazioni WHERE"
+          " device_id != 'SYSTEM'",
+          conn_b,
+      )
+      conn_b.close()
+
+      if not df_prenotazioni_attive.empty:
+        df_prenotazioni_attive["label"] = (
+            df_prenotazioni_attive["id"].astype(str)
+            + " - "
+            + df_prenotazioni_attive["nome"]
+            + " ("
+            + df_prenotazioni_attive["trattamento"]
+            + ")"
+        )
+        scelta_ban = st.selectbox(
+            "Seleziona utente/prenotazione da bannare",
+            df_prenotazioni_attive["label"].tolist(),
+            key="seleziona_ban_input",
+        )
+        if st.button("Banna Utente Selezionato"):
+          id_selezionato = int(scelta_ban.split(" - ")[0])
+          conn = sqlite3.connect("prenotazioni.db")
+          c = conn.cursor()
+          c.execute(
+              "SELECT device_id FROM prenotazioni WHERE id = ?",
+              (id_selezionato,),
+          )
+          res = c.fetchone()
+          if res and res[0]:
+            dev_id_da_bannare = res[0]
+            c.execute(
+                "INSERT OR IGNORE INTO banned_devices (device_id) VALUES (?)",
+                (dev_id_da_bannare,),
+            )
+            conn.commit()
+            st.success(
+                f"L'utente associato alla prenotazione #{id_selezionato}"
+                f" (Dispositivo: {dev_id_da_bannare}) è stato bannato con"
+                " successo!"
+            )
+          conn.close()
+          st.rerun()
+      else:
+        st.info(
+            "Nessuna prenotazione disponibile da cui ricavare l'utente da"
+            " bannare."
+        )
+
+    st.markdown("##### 📋 Blacklist Dispositivi & Nominativi Associati")
+    conn = sqlite3.connect("prenotazioni.db")
+    df_banned = pd.read_sql_query(
+        """
+        SELECT b.device_id, 
+               COALESCE(GROUP_CONCAT(DISTINCT p.nome), 'Nessun nome registrato') AS nominativi_utilizzati
+        FROM banned_devices b
+        LEFT JOIN prenotazioni p ON b.device_id = p.device_id
+        GROUP BY b.device_id
+    """,
+        conn,
     )
-    if st.button("Elimina Prenotazione Selezionata"):
-      if id_da_eliminare > 0:
+    conn.close()
+
+    if not df_banned.empty:
+      st.dataframe(df_banned, use_container_width=True)
+      dev_da_sbannare = st.selectbox(
+          "Seleziona Dispositivo da rimuovere dalla blacklist",
+          df_banned["device_id"].tolist(),
+          key="sbianca_device",
+      )
+      if st.button("Rimuovi Ban (Sbanna)"):
         conn = sqlite3.connect("prenotazioni.db")
         c = conn.cursor()
-        c.execute("DELETE FROM prenotazioni WHERE id = ?", (id_da_eliminare,))
+        c.execute(
+            "DELETE FROM banned_devices WHERE device_id = ?", (dev_da_sbannare,)
+        )
         conn.commit()
         conn.close()
-        st.success(
-            f"Prenotazione con ID {id_da_eliminare} eliminata con successo!"
-        )
+        st.success(f"Dispositivo rimosso dalla blacklist con successo!")
         st.rerun()
+    else:
+      st.info("Nessun dispositivo presente nella blacklist.")
 
 
 # --- VISTA 2: PAGINA PRINCIPALE CLIENTE ---
 else:
-  if logo_path:
-    c1, c2, c3 = st.columns([1, 2, 1])
-    with c2:
-      st.image(logo_path, use_container_width=True)
-
-  st.title("Postura & Pilates")
-  st.write("**Dott.ssa Roberta Sinagra**")
-
-  tab1, tab2, tab3, tab4 = st.tabs(
-      ["📅 Prenota", "ℹ️ Info Studio", "📍 Dove Siamo", "📜 Regolamento"]
+  # Controllo preventivo se il dispositivo corrente è bannato
+  client_device_id = get_client_device_id()
+  conn = sqlite3.connect("prenotazioni.db")
+  c = conn.cursor()
+  c.execute(
+      "SELECT device_id FROM banned_devices WHERE device_id = ?",
+      (client_device_id,),
   )
+  is_banned = c.fetchone()
+  conn.close()
 
-  # TAB 1: PRENOTAZIONE
-  with tab1:
-    st.markdown("### Modulo di Prenotazione")
+  if is_banned:
+    if logo_path:
+      c1, c2, c3 = st.columns([1, 2, 1])
+      with c2:
+        st.image(logo_path, use_container_width=True)
+    st.error(
+        "⛔ Accesso negato: questo dispositivo è stato bloccato per"
+        " violazione delle regole del servizio."
+    )
+  else:
+    if logo_path:
+      c1, c2, c3 = st.columns([1, 2, 1])
+      with c2:
+        st.image(logo_path, use_container_width=True)
 
-    if st.session_state.get("reset_nome_flag", False):
-      st.session_state["nome_input"] = ""
-      st.session_state["reset_nome_flag"] = False
+    st.title("Postura & Pilates")
+    st.write("**Dott.ssa Roberta Sinagra**")
 
-    if "booking_success_msg" in st.session_state:
-      st.success(st.session_state["booking_success_msg"])
-      del st.session_state["booking_success_msg"]
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "📅 Prenota",
+        "ℹ️ Info Studio",
+        "📍 Dove Siamo",
+        "📜 Regolamento",
+    ])
 
-    with st.container(border=True):
-      nome = st.text_input("Nome e Cognome *", key="nome_input")
-      trattamento = st.selectbox(
-          "Seleziona Trattamento / Lezione *",
-          [
-              "Valutazione Posturale",
-              "Lezione Pilates Individuale",
-              "Pilates Duetto (in coppia)",
-              "Rieducazione Posturale Motorìa",
-          ],
-          key="trattamento_input",
-      )
+    # TAB 1: PRENOTAZIONE
+    with tab1:
+      st.markdown("### Modulo di Prenotazione")
 
-      col1, col2 = st.columns(2)
+      if st.session_state.get("reset_nome_flag", False):
+        st.session_state["nome_input"] = ""
+        st.session_state["reset_nome_flag"] = False
 
-      with col1:
-        data_scelta = st.date_input(
-            "Seleziona Data *", min_value=datetime.today(), key="data_input"
+      if "booking_success_msg" in st.session_state:
+        st.success(st.session_state["booking_success_msg"])
+        del st.session_state["booking_success_msg"]
+
+      with st.container(border=True):
+        nome = st.text_input("Nome e Cognome *", key="nome_input")
+        trattamento = st.selectbox(
+            "Seleziona Trattamento / Lezione *",
+            [
+                "Valutazione Posturale",
+                "Lezione Pilates Individuale",
+                "Pilates Duetto (in coppia)",
+                "Rieducazione Posturale Motorìa",
+            ],
+            key="trattamento_input",
         )
 
-      conn = sqlite3.connect("prenotazioni.db")
-      c = conn.cursor()
-      c.execute(
-          "SELECT ora, trattamento FROM prenotazioni WHERE data = ?",
-          (str(data_scelta),),
-      )
-      prenotazioni_giorno = c.fetchall()
-      conn.close()
+        col1, col2 = st.columns(2)
 
-      TUTTI_GLI_ORARI = [
-          "08:00",
-          "09:00",
-          "10:00",
-          "11:00",
-          "15:00",
-          "16:00",
-          "17:00",
-          "18:00",
-          "19:00",
-      ]
+        with col1:
+          data_scelta = st.date_input(
+              "Seleziona Data *", min_value=datetime.today(), key="data_input"
+          )
 
-      try:
-        local_tz = ZoneInfo("Europe/Rome")
-        current_datetime = datetime.now(local_tz)
-      except Exception:
-        current_datetime = datetime.now()
+        conn = sqlite3.connect("prenotazioni.db")
+        c = conn.cursor()
+        c.execute(
+            "SELECT ora, trattamento FROM prenotazioni WHERE data = ?",
+            (str(data_scelta),),
+        )
+        prenotazioni_giorno = c.fetchall()
+        conn.close()
 
-      current_date = current_datetime.date()
-      current_time = current_datetime.time()
+        TUTTI_GLI_ORARI = [
+            "08:00",
+            "09:00",
+            "10:00",
+            "11:00",
+            "15:00",
+            "16:00",
+            "17:00",
+            "18:00",
+            "19:00",
+        ]
 
-      orari_disponibili = []
-      for h in TUTTI_GLI_ORARI:
-        posti_occupati = 0
-        slot_bloccato = False
+        try:
+          local_tz = ZoneInfo("Europe/Rome")
+          current_datetime = datetime.now(local_tz)
+        except Exception:
+          current_datetime = datetime.now()
 
-        for p_ora, p_trattamento in prenotazioni_giorno:
-          if p_ora == h:
+        current_date = current_datetime.date()
+        current_time = current_datetime.time()
+
+        orari_disponibili = []
+        for h in TUTTI_GLI_ORARI:
+          posti_occupati = 0
+          slot_bloccato = False
+
+          for p_ora, p_trattamento in prenotazioni_giorno:
+            if p_ora == h:
+              if (
+                  p_trattamento in ("Chiusura Admin", "🔒 STUDIO CHIUSO")
+                  or "CHIUSO" in p_trattamento
+              ):
+                slot_bloccato = True
+                break
+              elif p_trattamento == "Pilates Duetto (in coppia)":
+                posti_occupati += 2
+              else:
+                posti_occupati += 1
+
+          if slot_bloccato:
+            continue
+
+          if trattamento == "Pilates Duetto (in coppia)":
+            if posti_occupati > 0:
+              continue
+          else:
+            if posti_occupati >= 2:
+              continue
+
+          if data_scelta == current_date:
+            slot_time = datetime.strptime(h, "%H:%M").time()
+            if slot_time <= current_time:
+              continue
+
+          orari_disponibili.append(h)
+
+        with col2:
+          if orari_disponibili:
+            ora_scelta = st.selectbox(
+                "Seleziona Ora *", orari_disponibili, key="ora_input"
+            )
+          else:
+            st.selectbox(
+                "Seleziona Ora *",
+                ["Tutto occupato"],
+                disabled=True,
+                key="dis_ora_occupato",
+            )
+            ora_scelta = None
+
+        submitted = st.button("Conferma Prenotazione")
+
+      if submitted:
+        conn_check = sqlite3.connect("prenotazioni.db")
+        c_check = conn_check.cursor()
+        c_check.execute(
+            "SELECT device_id FROM banned_devices WHERE device_id = ?",
+            (client_device_id,),
+        )
+        is_banned_now = c_check.fetchone()
+        conn_check.close()
+
+        if is_banned_now:
+          st.error(
+              "⛔ Spiacenti, questo dispositivo è stato bloccato. Impossibile"
+              " completare la prenotazione."
+          )
+        elif not nome.strip():
+          st.error("Per favore inserisci il tuo nome e cognome.")
+        elif not ora_scelta or ora_scelta == "Tutto occupato":
+          st.error(
+              "Spiacenti, tutti gli orari per questa data sono già occupati o"
+              " passati."
+          )
+        else:
+          conn = sqlite3.connect("prenotazioni.db")
+          c = conn.cursor()
+          c.execute(
+              "SELECT trattamento FROM prenotazioni WHERE data = ? AND ora = ?",
+              (str(data_scelta), ora_scelta),
+          )
+          esistenti = c.fetchall()
+
+          slot_occupato = False
+          posti_occupati = 0
+          for (p_trattamento,) in esistenti:
             if (
                 p_trattamento in ("Chiusura Admin", "🔒 STUDIO CHIUSO")
                 or "CHIUSO" in p_trattamento
             ):
-              slot_bloccato = True
+              slot_occupato = True
               break
             elif p_trattamento == "Pilates Duetto (in coppia)":
               posti_occupati += 2
             else:
               posti_occupati += 1
 
-        if slot_bloccato:
-          continue
+          impossibile_prenotare = False
+          if slot_occupato:
+            impossibile_prenotare = True
+          elif trattamento == "Pilates Duetto (in coppia)" and posti_occupati > 0:
+            impossibile_prenotare = True
+          elif trattamento != "Pilates Duetto (in coppia)" and posti_occupati >= 2:
+            impossibile_prenotare = True
 
-        if trattamento == "Pilates Duetto (in coppia)":
-          if posti_occupati > 0:
-            continue
-        else:
-          if posti_occupati >= 2:
-            continue
-
-        if data_scelta == current_date:
-          slot_time = datetime.strptime(h, "%H:%M").time()
-          if slot_time <= current_time:
-            continue
-
-        orari_disponibili.append(h)
-
-      with col2:
-        if orari_disponibili:
-          ora_scelta = st.selectbox(
-              "Seleziona Ora *", orari_disponibili, key="ora_input"
-          )
-        else:
-          st.selectbox(
-              "Seleziona Ora *",
-              ["Tutto occupato"],
-              disabled=True,
-              key="dis_ora_occupato",
-          )
-          ora_scelta = None
-
-      submitted = st.button("Conferma Prenotazione")
-
-    if submitted:
-      if not nome.strip():
-        st.error("Per favore inserisci il tuo nome e cognome.")
-      elif not ora_scelta or ora_scelta == "Tutto occupato":
-        st.error(
-            "Spiacenti, tutti gli orari per questa data sono già occupati o"
-            " passati."
-        )
-      else:
-        conn = sqlite3.connect("prenotazioni.db")
-        c = conn.cursor()
-        c.execute(
-            "SELECT trattamento FROM prenotazioni WHERE data = ? AND ora = ?",
-            (str(data_scelta), ora_scelta),
-        )
-        esistenti = c.fetchall()
-
-        slot_occupato = False
-        posti_occupati = 0
-        for (p_trattamento,) in esistenti:
-          if (
-              p_trattamento in ("Chiusura Admin", "🔒 STUDIO CHIUSO")
-              or "CHIUSO" in p_trattamento
-          ):
-            slot_occupato = True
-            break
-          elif p_trattamento == "Pilates Duetto (in coppia)":
-            posti_occupati += 2
+          if impossibile_prenotare:
+            st.error(
+                "⚠️ Spiacenti, questo orario non ha più disponibilità per il"
+                " trattamento scelto (potrebbe essere stato appena occupato)!"
+                " Riprova con un altro orario."
+            )
+            conn.close()
           else:
-            posti_occupati += 1
+            c.execute(
+                "INSERT INTO prenotazioni (nome, data, ora, trattamento,"
+                " data_creazione, device_id) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    nome,
+                    str(data_scelta),
+                    ora_scelta,
+                    trattamento,
+                    datetime.now().strftime("%Y-%m-%d %H:%M"),
+                    client_device_id,
+                ),
+            )
+            conn.commit()
+            conn.close()
 
-        impossibile_prenotare = False
-        if slot_occupato:
-          impossibile_prenotare = True
-        elif trattamento == "Pilates Duetto (in coppia)" and posti_occupati > 0:
-          impossibile_prenotare = True
-        elif trattamento != "Pilates Duetto (in coppia)" and posti_occupati >= 2:
-          impossibile_prenotare = True
+            data_formattata = data_scelta.strftime("%d/%m/%Y")
+            st.session_state["booking_success_msg"] = (
+                f"🎉 PRENOTAZIONE CONFERMATA!\n\nGrazie {nome}, ti aspettiamo il"
+                f" {data_formattata} alle ore {ora_scelta} per {trattamento}."
+            )
+            st.session_state["reset_nome_flag"] = True
+            st.rerun()
 
-        if impossibile_prenotare:
-          st.error(
-              "⚠️ Spiacenti, questo orario non ha più disponibilità per il"
-              " trattamento scelto (potrebbe essere stato appena occupato)!"
-              " Riprova con un altro orario."
-          )
-          conn.close()
-        else:
-          c.execute(
-              "INSERT INTO prenotazioni (nome, data, ora, trattamento,"
-              " data_creazione) VALUES (?, ?, ?, ?, ?)",
-              (
-                  nome,
-                  str(data_scelta),
-                  ora_scelta,
-                  trattamento,
-                  datetime.now().strftime("%Y-%m-%d %H:%M"),
-              ),
-          )
-          conn.commit()
-          conn.close()
+    # TAB 2: INFO STUDIO
+    with tab2:
+      st.markdown("### ℹ️ Informazioni sullo Studio")
+      st.write(
+          "Benvenuti nello studio della **Dott.ssa Roberta Sinagra**,"
+          " specializzato in Posturologia e Pilates."
+      )
 
-          data_formattata = data_scelta.strftime("%d/%m/%Y")
-          st.session_state["booking_success_msg"] = (
-              f"🎉 PRENOTAZIONE CONFERMATA!\n\nGrazie {nome}, ti aspettiamo il"
-              f" {data_formattata} alle ore {ora_scelta} per {trattamento}."
-          )
-          st.session_state["reset_nome_flag"] = True
-          st.rerun()
+    # TAB 3: DOVE SIAMO
+    with tab3:
+      st.markdown("### 📍 Dove Siamo & Contatti")
+      st.write("📍 **Indirizzo:** Inserisci qui l'indirizzo dello studio")
+      st.write("📞 **Telefono / WhatsApp:** +39 333 0000000")
 
-  # TAB 2: INFO STUDIO
-  with tab2:
-    st.markdown("### ℹ️ Informazioni sullo Studio")
-    st.write(
-        "Benvenuti nello studio della **Dott.ssa Roberta Sinagra**,"
-        " specializzato in Posturologia e Pilates."
-    )
-
-  # TAB 3: DOVE SIAMO
-  with tab3:
-    st.markdown("### 📍 Dove Siamo & Contatti")
-    st.write("📍 **Indirizzo:** Inserisci qui l'indirizzo dello studio")
-    st.write("📞 **Telefono / WhatsApp:** +39 333 0000000")
-
-  # TAB 4: REGOLAMENTO
-  with tab4:
-    st.markdown("### 📜 Regolamento dello Studio")
-    st.markdown("""
-        * 🕒 **Puntualità:** Si raccomanda di presentarsi circa 5 minuti prima dell'orario della seduta.
-        * 🧦 **Abbigliamento e Calzini:** È obbligatorio l'uso di **calzini antiscivolo** durante tutte le lezioni.
-        * 🧴 **Asciugamano:** Si richiede di portare un proprio asciugamano personale.
-        * 📵 **Cellulari:** Modalità silenziosa consigliata.
-        * ⏱️ **Disdette:** Preavviso minimo di 24 ore.
-        """)
+    # TAB 4: REGOLAMENTO
+    with tab4:
+      st.markdown("### 📜 Regolamento dello Studio")
+      st.markdown("""
+            * 🕒 **Puntualità:** Si raccomanda di presentarsi circa 5 minuti prima dell'orario della seduta.
+            * 🧦 **Abbigliamento e Calzini:** È obbligatorio l'uso di **calzini antiscivolo** durante tutte le lezioni.
+            * 🧴 **Asciugamano:** Si richiede di portare un proprio asciugamano personale.
+            * 📵 **Cellulari:** Modalità silenziosa consigliata.
+            * ⏱️ **Disdette:** Preavviso minimo di 24 ore.
+            """)
