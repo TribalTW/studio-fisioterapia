@@ -13,11 +13,11 @@ st.set_page_config(
     layout="centered",
 )
 
-# Stile CSS con riquadro personalizzato (#fca4c3) sia per il cliente che per l'admin
+# Stile CSS e Script JavaScript per l'auto-aggiornamento alla riapertura della scheda
 st.markdown(
     """
     <style>
-    /* Forzatura assoluta dello sfondo per tutti i contenitori con bordo (Client e Admin uguali) */
+    /* Forzatura assoluta dello sfondo per tutti i contenitori con bordo */
     div.stVerticalBlockBorderWrapper, div[data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #fca4c3 !important;
         border: 1px solid #e882a4 !important;
@@ -25,19 +25,16 @@ st.markdown(
         padding: 20px !important;
     }
     
-    /* Rende trasparenti i blocchi interni ai box colorati */
     div[data-testid="stVerticalBlockBorderWrapper"] div {
         background-color: transparent !important;
     }
     
-    /* Campi di testo, selezioni e selettore data con sfondo bianco */
     .stTextInput input, .stSelectbox > div > div, .stDateInput input, .stNumberInput input {
         background-color: #FFFFFF !important;
         border-radius: 8px !important;
         border: 1px solid #E0E0E0 !important;
     }
     
-    /* Pulsanti in rosa magenta originale */
     div.stButton > button {
         background-color: #D81B60 !important;
         color: white !important;
@@ -54,21 +51,27 @@ st.markdown(
         background-color: #C2185B !important;
     }
     
-    /* Titoli in rosa scuro */
     h1, h2, h3 {
         color: #880E4F !important;
         text-align: center;
     }
     
-    /* Centra i sottotitoli */
     .stCaption, p {
         text-align: center;
     }
     
-    /* Nasconde menu standard Streamlit */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     </style>
+
+    <!-- Script JavaScript: ricarica la pagina automaticamente non appena l'utente riapre la scheda o torna sull'app -->
+    <script>
+    document.addEventListener("visibilitychange", function() {
+        if (document.visibilityState === "visible") {
+            location.reload();
+        }
+    });
+    </script>
 """,
     unsafe_allow_html=True,
 )
@@ -548,7 +551,19 @@ else:
         submitted = st.button("Conferma Prenotazione")
 
       if submitted:
-        if not nome.strip():
+        # Controllo di sicurezza extra al momento del click (anti-furbetti)
+        conn_check = sqlite3.connect("prenotazioni.db")
+        c_check = conn_check.cursor()
+        c_check.execute("SELECT ip FROM banned_ips WHERE ip = ?", (client_ip,))
+        is_banned_now = c_check.fetchone()
+        conn_check.close()
+
+        if is_banned_now:
+          st.error(
+              "⛔ Spiacenti, questo dispositivo è stato bloccato. Impossibile"
+              " completare la prenotazione."
+          )
+        elif not nome.strip():
           st.error("Per favore inserisci il tuo nome e cognome.")
         elif not ora_scelta or ora_scelta == "Tutto occupato":
           st.error(
