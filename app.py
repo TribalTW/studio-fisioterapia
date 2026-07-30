@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import datetime
 import os
 import sqlite3
@@ -450,14 +451,35 @@ else:
               "Seleziona Data *", min_value=datetime.today(), key="data_input"
           )
 
-        # Calcolo orari già occupati o bloccati per la data selezionata
+        # Analisi delle prenotazioni e dei blocchi admin per la data selezionata
         conn = sqlite3.connect("prenotazioni.db")
         c = conn.cursor()
         c.execute(
-            "SELECT ora FROM prenotazioni WHERE data = ?", (str(data_scelta),)
+            "SELECT ora, trattamento, nome, ip FROM prenotazioni WHERE data = ?",
+            (str(data_scelta),),
         )
-        orari_occupati = [row[0] for row in c.fetchall()]
+        righe_data = c.fetchall()
         conn.close()
+
+        orari_admin_bloccati = set()
+        carico_orari = defaultdict(int)
+
+        for ora_r, tratt_r, nome_r, ip_r in righe_data:
+          if (
+              nome_r
+              and (
+                  "🔒" in nome_r
+                  or "CHIUSO" in nome_r
+                  or ip_r == "SYSTEM"
+                  or "Chiusura" in nome_r
+              )
+          ):
+            orari_admin_bloccati.add(ora_r)
+          else:
+            if tratt_r == "Pilates Duetto (in coppia)":
+              carico_orari[ora_r] += 2
+            else:
+              carico_orari[ora_r] += 1
 
         TUTTI_GLI_ORARI = [
             "08:00",
@@ -471,7 +493,7 @@ else:
             "19:00",
         ]
 
-        # Ottiene l'orario attuale italiano (gestisce correttamente il fuso orario)
+        # Ottiene l'orario attuale italiano
         try:
           local_tz = ZoneInfo("Europe/Rome")
           current_datetime = datetime.now(local_tz)
@@ -483,12 +505,22 @@ else:
 
         orari_disponibili = []
         for h in TUTTI_GLI_ORARI:
-          if h in orari_occupati:
+          if h in orari_admin_bloccati:
             continue
+
+          # Se seleziona "In coppia" (2 posti), serve che l'orario sia completamente vuoto (carico 0)
+          if trattamento == "Pilates Duetto (in coppia)":
+            if carico_orari[h] > 0:
+              continue
+          else:
+            # Per i trattamenti singoli, basta che non ci siano già 2 posti occupati
+            if carico_orari[h] >= 2:
+              continue
+
           if data_scelta == current_date:
             slot_time = datetime.strptime(h, "%H:%M").time()
             if slot_time <= current_time:
-              continue  # Salta gli orari già trascorsi nella giornata odierna
+              continue
           orari_disponibili.append(h)
 
         with col2:
@@ -507,7 +539,7 @@ else:
 
         submitted = st.button("Conferma Prenotazione")
 
-      # Logica di salvataggio con salvataggio IP
+      # Logica di salvataggio con controllo capienza avanzato (Duetto = 2 posti)
       if submitted:
         if not nome.strip():
           st.error("Per favore inserisci il tuo nome e cognome.")
@@ -520,15 +552,45 @@ else:
           conn = sqlite3.connect("prenotazioni.db")
           c = conn.cursor()
           c.execute(
-              "SELECT id FROM prenotazioni WHERE data = ? AND ora = ?",
+              "SELECT ora, trattamento, nome, ip FROM prenotazioni WHERE data ="
+              " ? AND ora = ?",
               (str(data_scelta), ora_scelta),
           )
-          gia_prenotato = c.fetchone()
+          righe_orario = c.fetchall()
 
-          if gia_prenotato:
+          admin_bloccato = False
+          carico_attuale = 0
+          for ora_r, tratt_r, nome_r, ip_r in righe_orario:
+            if (
+                nome_r
+                and (
+                    "🔒" in nome_r
+                    or "CHIUSO" in nome_r
+                    or ip_r == "SYSTEM"
+                    or "Chiusura" in nome_r
+                )
+            ):
+              admin_bloccato = True
+            else:
+              if tratt_r == "Pilates Duetto (in coppia)":
+                carico_attuale += 2
+              else:
+                carico_attuale += 1
+
+          posti_richiesti = (
+              2 if trattamento == "Pilates Duetto (in coppia)" else 1
+          )
+
+          if admin_bloccato:
             st.error(
-                "⚠️ Spiacenti, questo orario è stato appena occupato! Riprova"
-                " con un altro orario."
+                "⚠️ Spiacenti, questo orario è stato chiuso"
+                " dall'amministratore!"
+            )
+            conn.close()
+          elif carico_attuale + posti_richiesti > 2:
+            st.error(
+                "⚠️ Spiacenti, non ci sono abbastanza posti disponibili in"
+                " questo orario per il trattamento selezionato! Riprova."
             )
             conn.close()
           else:
