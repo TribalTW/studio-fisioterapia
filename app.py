@@ -1,6 +1,7 @@
 from datetime import datetime
 import os
 import sqlite3
+import uuid
 from zoneinfo import ZoneInfo
 import pandas as pd
 import streamlit as st
@@ -105,16 +106,28 @@ def init_db():
 init_db()
 
 
-# Funzione per ricavare l'IP del client
+# Funzione avanzata per ricavare l'IP del client (con isolamento dispositivi in locale)
 def get_client_ip():
+  ip = "127.0.0.1"
   try:
     if hasattr(st, "context") and hasattr(st.context, "headers"):
       forwarded = st.context.headers.get("X-Forwarded-For", "")
       if forwarded:
-        return forwarded.split(",")[0].strip()
+        ip = forwarded.split(",")[0].strip()
+      else:
+        remote_addr = st.context.headers.get("Remote-Addr", "")
+        if remote_addr:
+          ip = remote_addr
   except Exception:
     pass
-  return "127.0.0.1"
+
+  # Se siamo in locale (127.0.0.1), usa un ID di sessione unico per separare PC e telefono nei test
+  if ip == "127.0.0.1":
+    if "local_device_id" not in st.session_state:
+      st.session_state["local_device_id"] = str(uuid.uuid4())[:8]
+    return f"local_device_{st.session_state['local_device_id']}"
+
+  return ip
 
 
 # Cerca se esiste il file del logo
@@ -327,7 +340,7 @@ if st.session_state["admin_logged_in"]:
           st.rerun()
 
     with col_sec2:
-      st.markdown("##### Ban Indirizzo IP")
+      st.markdown("##### Ban Indirizzo IP / Dispositivo")
       ip_da_bannare = st.text_input(
           "Inserisci Indirizzo IP da bannare", key="ip_ban_input"
       )
@@ -385,7 +398,7 @@ if st.session_state["admin_logged_in"]:
 
 # --- VISTA 2: PAGINA PRINCIPALE CLIENTE ---
 else:
-  # Controllo preventivo se l'IP del client è bannato
+  # Controllo preventivo se il client è bannato
   client_ip = get_client_ip()
   conn = sqlite3.connect("prenotazioni.db")
   c = conn.cursor()
