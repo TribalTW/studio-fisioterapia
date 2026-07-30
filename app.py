@@ -99,22 +99,27 @@ def init_db():
 init_db()
 
 
-# Identificazione univoca persistente tramite LocalStorage del browser
+# Identificazione univoca persistente tramite LocalStorage con schermata di caricamento e anti-cache
 def get_client_device_id():
   if "dev_id" not in st.query_params or not st.query_params["dev_id"].strip():
     components.html(
         """
+        <div style="display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #fff0f5;">
+            <h3 style="color: #880E4F; font-family: sans-serif;">Caricamento studio in corso... 🧘‍♀️</h3>
+        </div>
         <script>
         let devId = localStorage.getItem('pilates_dev_id');
         if (!devId) {
             devId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
             localStorage.setItem('pilates_dev_id', devId);
         }
-        window.location.search = '?dev_id=' + devId;
+        if (!window.location.search.includes('dev_id=' + devId)) {
+            window.location.href = window.location.pathname + '?dev_id=' + devId + '&_=' + new Date().getTime();
+        }
         </script>
         """,
-        height=0,
-        width=0,
+        height=650,
+        width=None,
     )
     st.stop()
   return f"device_{st.query_params['dev_id']}"
