@@ -13,7 +13,7 @@ st.set_page_config(
     layout="centered",
 )
 
-# Stile CSS e Script JavaScript avanzato (LocalStorage + Auto-refresh)
+# Stile CSS e Script JavaScript avanzato (LocalStorage + Sincronizzazione URL obbligatoria)
 st.markdown(
     """
     <style>
@@ -63,24 +63,22 @@ st.markdown(
     footer {visibility: hidden;}
     </style>
 
-    <!-- Script JavaScript Definitivo: gestisce localStorage per nuove schede e auto-refresh -->
+    <!-- Script JavaScript: sincronizza LocalStorage con l'URL ed esegue l'auto-refresh alla riapertura della scheda -->
     <script>
     (function() {
-        // 1. Gestione ID Persistente tramite LocalStorage (funziona anche aprendo nuove schede o link salvati)
         let deviceId = localStorage.getItem('persistent_device_id');
         if (!deviceId) {
-            deviceId = 'dev_' + Math.random().toString(36).substring(2, 12);
+            deviceId = 'device_' + Math.random().toString(36).substring(2, 12);
             localStorage.setItem('persistent_device_id', deviceId);
         }
-
-        // 2. Forza l'URL ad avere sempre il dev_id corretto della memoria del browser
+        
+        let cleanId = deviceId.replace(/^device_|^dev_/, '');
         const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('dev_id') !== deviceId) {
-            urlParams.set('dev_id', deviceId);
+        if (urlParams.get('dev_id') !== cleanId) {
+            urlParams.set('dev_id', cleanId);
             window.location.replace(window.location.pathname + '?' + urlParams.toString());
         }
 
-        // 3. Ricarica automatica della pagina quando l'utente torna sulla scheda (da background a primo piano)
         document.addEventListener("visibilitychange", function() {
             if (document.visibilityState === "visible") {
                 location.reload();
@@ -124,11 +122,22 @@ def init_db():
 
 init_db()
 
+# --- BLOCCO DI SICUREZZA PREVENTIVO (Impedisce l'avvio se manca il dev_id) ---
+if "dev_id" not in st.query_params or not st.query_params["dev_id"].strip():
+  st.markdown(
+      """
+        <div style="text-align: center; margin-top: 100px;">
+            <h3>Caricamento in corso... 🧘‍♀️</h3>
+            <p>Verifica sicurezza dispositivo in corso...</p>
+        </div>
+    """,
+      unsafe_allow_html=True,
+  )
+  st.stop()
 
-# Identificazione dispositivo blindata tramite parametri URL sincronizzati con localStorage
+
+# Identificazione dispositivo blindata tramite parametri URL sincronizzati
 def get_client_ip():
-  if "dev_id" not in st.query_params or not st.query_params["dev_id"].strip():
-    st.query_params["dev_id"] = str(uuid.uuid4())[:8]
   return f"device_{st.query_params['dev_id']}"
 
 
@@ -614,6 +623,9 @@ else:
           elif trattamento == "Pilates Duetto (in coppia)" and posti_occupati > 0:
             impossibile_prenotare = True
           elif trattamento != "Pilates Duetto (in coppia)" and posti_occupati >= 2:
+            impossibile_preventiva = (
+                True  # o impossibile_prenotare = True
+            )
             impossibile_prenotare = True
 
           if impossibile_prenotare:
