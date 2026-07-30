@@ -1,10 +1,10 @@
 from datetime import datetime
 import os
 import sqlite3
-import uuid
 from zoneinfo import ZoneInfo
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 # Configurazione Pagina
 st.set_page_config(
@@ -99,11 +99,24 @@ def init_db():
 init_db()
 
 
-# Identificazione univoca del singolo dispositivo tramite parametri URL nativi
+# Identificazione univoca persistente tramite LocalStorage del browser
 def get_client_device_id():
   if "dev_id" not in st.query_params or not st.query_params["dev_id"].strip():
-    st.query_params["dev_id"] = uuid.uuid4().hex[:10]
-    st.rerun()
+    components.html(
+        """
+        <script>
+        let devId = localStorage.getItem('pilates_dev_id');
+        if (!devId) {
+            devId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+            localStorage.setItem('pilates_dev_id', devId);
+        }
+        window.location.search = '?dev_id=' + devId;
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
+    st.stop()
   return f"device_{st.query_params['dev_id']}"
 
 
