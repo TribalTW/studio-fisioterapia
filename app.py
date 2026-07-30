@@ -13,13 +13,18 @@ st.set_page_config(
     layout="centered",
 )
 
-# Stile CSS aggiornato con selettori multipli per forzare lo sfondo
+# Stile CSS con forzatura radicale della radice di Streamlit
 st.markdown(
     """
     <style>
-    /* Forzatura globale dello sfondo principale */
-    .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
+    /* Forzatura estrema su tutti i livelli radice di Streamlit per bloccare il colore */
+    html, body, [data-testid="stRoot"], [data-testid="stAppViewContainer"], .stApp {
         background-color: #f7dae4 !important;
+    }
+    
+    /* Rimozione sfondi trasparenti interni al contenitore principale */
+    .main, [data-testid="stMain"] {
+        background-color: transparent !important;
     }
 
     /* Forzatura assoluta dello sfondo rosa per il contenitore del modulo */
