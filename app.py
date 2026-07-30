@@ -19,7 +19,7 @@ st.markdown(
     <style>
     /* Forzatura assoluta dello sfondo rosa per il contenitore del modulo */
     div.stVerticalBlockBorderWrapper, div[data-testid="stVerticalBlockBorderWrapper"] {
-        background-color: #FACADA !important;
+        background-color: #592a3b !important;
         border: 1px solid #F8BBD0 !important;
         border-radius: 16px !important;
         padding: 20px !important;
