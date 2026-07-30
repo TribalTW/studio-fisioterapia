@@ -19,7 +19,7 @@ st.markdown(
     <style>
     /* Sfondo principale dell'intera applicazione */
     .stApp {
-        background-color: #FAF0F5 !important;
+        background-color: #f7dae4 !important;
     }
     
     /* Forzatura assoluta dello sfondo rosa per il contenitore del modulo */
