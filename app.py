@@ -106,7 +106,7 @@ def init_db():
 init_db()
 
 
-# Funzione avanzata per ricavare l'IP del client (con isolamento dispositivi in locale)
+# Funzione avanzata per ricavare l'IP del client (con ID persistente per test in locale)
 def get_client_ip():
   ip = "127.0.0.1"
   try:
@@ -121,11 +121,11 @@ def get_client_ip():
   except Exception:
     pass
 
-  # Se siamo in locale (127.0.0.1), usa un ID di sessione unico per separare PC e telefono nei test
+  # Se siamo in locale, usa i query params per mantenere lo stesso ID stabile sul browser del telefono
   if ip == "127.0.0.1":
-    if "local_device_id" not in st.session_state:
-      st.session_state["local_device_id"] = str(uuid.uuid4())[:8]
-    return f"local_device_{st.session_state['local_device_id']}"
+    if "dev_id" not in st.query_params:
+      st.query_params["dev_id"] = str(uuid.uuid4())[:8]
+    return f"local_device_{st.query_params['dev_id']}"
 
   return ip
 
