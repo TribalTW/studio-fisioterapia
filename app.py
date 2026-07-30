@@ -13,12 +13,12 @@ st.set_page_config(
     layout="centered",
 )
 
-# Stile CSS con sfondo principale personalizzato (#f7dae4), riquadro rosa e pulsanti rosa magenta originali
+# Stile CSS aggiornato con selettori multipli per forzare lo sfondo
 st.markdown(
     """
     <style>
-    /* Sfondo principale dell'intera applicazione */
-    .stApp {
+    /* Forzatura globale dello sfondo principale */
+    .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
         background-color: #f7dae4 !important;
     }
 
