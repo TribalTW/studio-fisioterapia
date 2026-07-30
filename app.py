@@ -1,10 +1,9 @@
 from datetime import datetime
 import os
 import sqlite3
-import streamlit as st
-import streamlit.components.v1 as components
 from zoneinfo import ZoneInfo
 import pandas as pd
+import streamlit as st
 
 # Configurazione Pagina
 st.set_page_config(
@@ -66,35 +65,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Componente JavaScript sicuro per la gestione del LocalStorage e Sincronizzazione URL
-components.html(
-    """
-    <script>
-    (function() {
-        let deviceId = localStorage.getItem('persistent_device_id');
-        if (!deviceId) {
-            deviceId = 'device_' + Math.random().toString(36).substring(2, 12);
-            localStorage.setItem('persistent_device_id', deviceId);
-        }
-        
-        let cleanId = deviceId.replace(/^device_|^dev_/, '');
-        const urlParams = new URLSearchParams(window.parent.location.search);
-        if (urlParams.get('dev_id') !== cleanId) {
-            urlParams.set('dev_id', cleanId);
-            window.parent.location.replace(window.parent.location.pathname + '?' + urlParams.toString());
-        }
-
-        window.parent.document.addEventListener("visibilitychange", function() {
-            if (window.parent.document.visibilityState === "visible") {
-                window.parent.location.reload();
-            }
-        });
-    })();
-    </script>
-""",
-    height=0,
-)
-
 
 # Inizializzazione Database SQLite con supporto IP e Ban
 def init_db():
@@ -127,24 +97,23 @@ def init_db():
 
 init_db()
 
-# --- BLOCCO DI SICUREZZA PREVENTIVO ---
-# Attende che JavaScript sincronizzi il LocalStorage nell'URL prima di caricare l'app
-if "dev_id" not in st.query_params or not st.query_params["dev_id"].strip():
-  st.markdown(
-      """
-        <div style="text-align: center; margin-top: 100px;">
-            <h3>Caricamento in corso... 🧘‍♀️</h3>
-            <p>Verifica sicurezza dispositivo in corso...</p>
-        </div>
-    """,
-      unsafe_allow_html=True,
-  )
-  st.stop()
 
-
-# Identificazione dispositivo blindata basata esclusivamente sul LocalStorage
+# Identificazione dispositivo basata sull'indirizzo IP di rete (robusta e istantanea)
 def get_client_ip():
-  return f"device_{st.query_params['dev_id']}"
+  try:
+    headers = st.context.headers
+    ip = headers.get("X-Forwarded-For") or headers.get("X-Real-IP")
+    if ip:
+      if "," in ip:
+        ip = ip.split(",")[0].strip()
+      return f"ip_{ip}"
+  except Exception:
+    pass
+
+  # Fallback locale di sicurezza se eseguito in locale senza proxy headers
+  if "local_fallback_id" not in st.session_state:
+    st.session_state["local_fallback_id"] = "device_local_user"
+  return st.session_state["local_fallback_id"]
 
 
 # Cerca se esiste il file del logo
