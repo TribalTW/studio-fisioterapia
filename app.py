@@ -1,9 +1,10 @@
 from datetime import datetime
 import os
 import sqlite3
+import streamlit as st
+import streamlit.components.v1 as components
 from zoneinfo import ZoneInfo
 import pandas as pd
-import streamlit as st
 
 # Configurazione Pagina
 st.set_page_config(
@@ -12,7 +13,7 @@ st.set_page_config(
     layout="centered",
 )
 
-# Stile CSS e Script JavaScript avanzato (LocalStorage + Sincronizzazione URL)
+# Stile CSS della pagina
 st.markdown(
     """
     <style>
@@ -61,8 +62,13 @@ st.markdown(
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     </style>
+""",
+    unsafe_allow_html=True,
+)
 
-    <!-- Script JavaScript: legge LocalStorage e sincronizza istantaneamente l'URL -->
+# Componente JavaScript sicuro per la gestione del LocalStorage e Sincronizzazione URL
+components.html(
+    """
     <script>
     (function() {
         let deviceId = localStorage.getItem('persistent_device_id');
@@ -72,21 +78,21 @@ st.markdown(
         }
         
         let cleanId = deviceId.replace(/^device_|^dev_/, '');
-        const urlParams = new URLSearchParams(window.location.search);
+        const urlParams = new URLSearchParams(window.parent.location.search);
         if (urlParams.get('dev_id') !== cleanId) {
             urlParams.set('dev_id', cleanId);
-            window.location.replace(window.location.pathname + '?' + urlParams.toString());
+            window.parent.location.replace(window.parent.location.pathname + '?' + urlParams.toString());
         }
 
-        document.addEventListener("visibilitychange", function() {
-            if (document.visibilityState === "visible") {
-                location.reload();
+        window.parent.document.addEventListener("visibilitychange", function() {
+            if (window.parent.document.visibilityState === "visible") {
+                window.parent.location.reload();
             }
         });
     })();
     </script>
 """,
-    unsafe_allow_html=True,
+    height=0,
 )
 
 
