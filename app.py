@@ -5,6 +5,7 @@ import uuid
 from zoneinfo import ZoneInfo
 import pandas as pd
 import streamlit as st
+from streamlit_cookies_controller import CookieController
 
 # Configurazione Pagina
 st.set_page_config(
@@ -12,6 +13,9 @@ st.set_page_config(
     page_icon="🧘‍♀️",
     layout="centered",
 )
+
+# Inizializzazione Controller Cookie per persistenza reale del dispositivo in locale
+controller = CookieController()
 
 # Stile CSS con riquadro personalizzato (#fca4c3) sia per il cliente che per l'admin
 st.markdown(
@@ -106,7 +110,7 @@ def init_db():
 init_db()
 
 
-# Funzione avanzata per ricavare l'IP del client (con ID persistente per test in locale)
+# Funzione avanzata per ricavare l'identificativo client tramite Cookie persistenti
 def get_client_ip():
   ip = "127.0.0.1"
   try:
@@ -121,11 +125,13 @@ def get_client_ip():
   except Exception:
     pass
 
-  # Se siamo in locale, usa i query params per mantenere lo stesso ID stabile sul browser del telefono
+  # Se siamo in locale, usiamo un cookie persistente nel browser del telefono
   if ip == "127.0.0.1":
-    if "dev_id" not in st.query_params:
-      st.query_params["dev_id"] = str(uuid.uuid4())[:8]
-    return f"local_device_{st.query_params['dev_id']}"
+    device_id = controller.get("dev_device_id")
+    if not device_id:
+      device_id = str(uuid.uuid4())[:8]
+      controller.set("dev_device_id", device_id, max_age=365 * 24 * 60 * 60)
+    return f"local_device_{device_id}"
 
   return ip
 
@@ -174,7 +180,7 @@ if st.session_state["admin_logged_in"]:
     st.rerun()
 
 
-# --- VISTA 1: PANNELLO AMMINISTRATORE (Con box coordinati) ---
+# --- VISTA 1: PANNELLO AMMINISTRATORE ---
 if st.session_state["admin_logged_in"]:
   st.title("📊 Gestione Appuntamenti & Studio (Admin)")
 
@@ -240,7 +246,6 @@ if st.session_state["admin_logged_in"]:
     with col_btn2:
       btn_sblocca = st.button("🔓 Sblocca Selezionati")
 
-    # Logica comune di estrazione date per Blocco/Sblocco
     if btn_blocca or btn_sblocca:
       if isinstance(data_intervallo, tuple):
         if len(data_intervallo) == 2:
@@ -437,7 +442,6 @@ else:
         " delle regole del servizio."
     )
   else:
-    # MOSTRA IL LOGO CENTRATO IN CIMA ALLA PAGINA
     if logo_path:
       c1, c2, c3 = st.columns([1, 2, 1])
       with c2:
@@ -446,7 +450,6 @@ else:
     st.title("Postura & Pilates")
     st.write("**Dott.ssa Roberta Sinagra**")
 
-    # Schede di Navigazione
     tab1, tab2, tab3, tab4 = st.tabs([
         "📅 Prenota",
         "ℹ️ Info Studio",
@@ -454,21 +457,18 @@ else:
         "📜 Regolamento",
     ])
 
-    # TAB 1: PRENOTAZIONE DINAMICA E REATTIVA
+    # TAB 1: PRENOTAZIONE
     with tab1:
       st.markdown("### Modulo di Prenotazione")
 
-      # RESET SELETTIVO: Pulisce solo il nome dopo la conferma
       if st.session_state.get("reset_nome_flag", False):
         st.session_state["nome_input"] = ""
         st.session_state["reset_nome_flag"] = False
 
-      # Messaggio di conferma verde se presente
       if "booking_success_msg" in st.session_state:
         st.success(st.session_state["booking_success_msg"])
         del st.session_state["booking_success_msg"]
 
-      # RIQUADRO ROSA NATIVO CLIENTE
       with st.container(border=True):
         nome = st.text_input("Nome e Cognome *", key="nome_input")
         trattamento = st.selectbox(
@@ -482,7 +482,6 @@ else:
             key="trattamento_input",
         )
 
-        # DATA ED ORA AFFIANCATE IN DUE COLONNE
         col1, col2 = st.columns(2)
 
         with col1:
@@ -490,7 +489,6 @@ else:
               "Seleziona Data *", min_value=datetime.today(), key="data_input"
           )
 
-        # Calcolo disponibilità orari in base al trattamento e alla capienza (max 2 persone)
         conn = sqlite3.connect("prenotazioni.db")
         c = conn.cursor()
         c.execute(
@@ -512,7 +510,6 @@ else:
             "19:00",
         ]
 
-        # Ottiene l'orario attuale italiano
         try:
           local_tz = ZoneInfo("Europe/Rome")
           current_datetime = datetime.now(local_tz)
@@ -543,8 +540,6 @@ else:
           if slot_bloccato:
             continue
 
-          # Regola capienza: se si sceglie coppia serve slot totalmente libero (0 posti occupati)
-          # Se si sceglie individuale/altro servono meno di 2 posti occupati (< 2)
           if trattamento == "Pilates Duetto (in coppia)":
             if posti_occupati > 0:
               continue
@@ -552,7 +547,6 @@ else:
             if posti_occupati >= 2:
               continue
 
-          # Controllo orari passati nella giornata odierna
           if data_scelta == current_date:
             slot_time = datetime.strptime(h, "%H:%M").time()
             if slot_time <= current_time:
@@ -576,7 +570,6 @@ else:
 
         submitted = st.button("Conferma Prenotazione")
 
-      # Logica di salvataggio con controllo capienza e IP
       if submitted:
         if not nome.strip():
           st.error("Per favore inserisci il tuo nome e cognome.")
@@ -654,30 +647,20 @@ else:
           "Benvenuti nello studio della **Dott.ssa Roberta Sinagra**,"
           " specializzato in Posturologia e Pilates."
       )
-      st.write(
-          "I nostri percorsi individuali e di coppia sono pensati per migliorare"
-          " la postura, prevenire dolori e ritrovare il benessere del corpo."
-      )
 
     # TAB 3: DOVE SIAMO
     with tab3:
       st.markdown("### 📍 Dove Siamo & Contatti")
       st.write("📍 **Indirizzo:** Inserisci qui l'indirizzo dello studio")
       st.write("📞 **Telefono / WhatsApp:** +39 333 0000000")
-      st.write("✉️ **Email:** info@posturaepilates.it")
 
-    # TAB 4: REGOLAMENTO STUDIO
+    # TAB 4: REGOLAMENTO
     with tab4:
       st.markdown("### 📜 Regolamento dello Studio")
-      st.write(
-          "Per garantire un ambiente sereno, pulito e professionale a tutti i"
-          " pazienti, vi preghiamo di prendere visione delle seguenti regole:"
-      )
-
       st.markdown("""
             * 🕒 **Puntualità:** Si raccomanda di presentarsi circa 5 minuti prima dell'orario della seduta.
             * 🧦 **Abbigliamento e Calzini:** È obbligatorio l'uso di **calzini antiscivolo** durante tutte le lezioni.
-            * 🧴 **Asciugamano:** Si richiede di portare un proprio asciugamano personale da stendere sui macchinari/tappetini.
-            * 📵 **Cellulari:** Vi chiediamo di mantenere il telefono in modalità silenziosa per rispettare la concentrazione e il relax.
-            * ⏱️ **Disdette:** Le disdette o gli spostamenti devono essere comunicati con almeno **24 ore di anticipo**. In caso contrario, la seduta verrà regolarmente conteggiata.
+            * 🧴 **Asciugamano:** Si richiede di portare un proprio asciugamano personale.
+            * 📵 **Cellulari:** Modalità silenziosa consigliata.
+            * ⏱️ **Disdette:** Preavviso minimo di 24 ore.
             """)
