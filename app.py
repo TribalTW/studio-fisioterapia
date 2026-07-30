@@ -123,10 +123,12 @@ def init_db():
 init_db()
 
 
-# Identificazione dispositivo tramite parametri URL sincronizzati con localStorage
+# Identificazione dispositivo: se manca il dev_id, genera un ID univoco isolato per sessione
 def get_client_ip():
   if "dev_id" not in st.query_params or not st.query_params["dev_id"].strip():
-    return "device_temp"
+    if "fallback_dev_id" not in st.session_state:
+      st.session_state["fallback_dev_id"] = str(uuid.uuid4())[:8]
+    return f"device_{st.session_state['fallback_dev_id']}"
   return f"device_{st.query_params['dev_id']}"
 
 
