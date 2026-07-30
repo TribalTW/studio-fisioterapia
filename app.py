@@ -452,13 +452,14 @@ else:
               "Seleziona Data *", min_value=datetime.today(), key="data_input"
           )
 
-        # Calcolo orari già occupati o bloccati per la data selezionata
+        # Calcolo disponibilità orari in base al trattamento e alla capienza (max 2 persone)
         conn = sqlite3.connect("prenotazioni.db")
         c = conn.cursor()
         c.execute(
-            "SELECT ora FROM prenotazioni WHERE data = ?", (str(data_scelta),)
+            "SELECT ora, trattamento FROM prenotazioni WHERE data = ?",
+            (str(data_scelta),),
         )
-        orari_occupati = [row[0] for row in c.fetchall()]
+        prenotazioni_giorno = c.fetchall()
         conn.close()
 
         TUTTI_GLI_ORARI = [
@@ -485,12 +486,40 @@ else:
 
         orari_disponibili = []
         for h in TUTTI_GLI_ORARI:
-          if h in orari_occupati:
+          posti_occupati = 0
+          slot_bloccato = False
+
+          for p_ora, p_trattamento in prenotazioni_giorno:
+            if p_ora == h:
+              if (
+                  p_trattamento in ("Chiusura Admin", "🔒 STUDIO CHIUSO")
+                  or "CHIUSO" in p_trattamento
+              ):
+                slot_bloccato = True
+                break
+              elif p_trattamento == "Pilates Duetto (in coppia)":
+                posti_occupati += 2
+              else:
+                posti_occupati += 1
+
+          if slot_bloccato:
             continue
+
+          # Regola capienza: se si sceglie coppia serve slot totalmente libero (0 posti occupati)
+          # Se si sceglie individuale/altro servono meno di 2 posti occupati (< 2)
+          if trattamento == "Pilates Duetto (in coppia)":
+            if posti_occupati > 0:
+              continue
+          else:
+            if posti_occupati >= 2:
+              continue
+
+          # Controllo orari passati nella giornata odierna
           if data_scelta == current_date:
             slot_time = datetime.strptime(h, "%H:%M").time()
             if slot_time <= current_time:
               continue
+
           orari_disponibili.append(h)
 
         with col2:
@@ -509,7 +538,7 @@ else:
 
         submitted = st.button("Conferma Prenotazione")
 
-      # Logica di salvataggio con salvataggio IP
+      # Logica di salvataggio con controllo capienza e IP
       if submitted:
         if not nome.strip():
           st.error("Per favore inserisci il tuo nome e cognome.")
@@ -522,15 +551,38 @@ else:
           conn = sqlite3.connect("prenotazioni.db")
           c = conn.cursor()
           c.execute(
-              "SELECT id FROM prenotazioni WHERE data = ? AND ora = ?",
+              "SELECT trattamento FROM prenotazioni WHERE data = ? AND ora = ?",
               (str(data_scelta), ora_scelta),
           )
-          gia_prenotato = c.fetchone()
+          esistenti = c.fetchall()
 
-          if gia_prenotato:
+          slot_occupato = False
+          posti_occupati = 0
+          for (p_trattamento,) in esistenti:
+            if (
+                p_trattamento in ("Chiusura Admin", "🔒 STUDIO CHIUSO")
+                or "CHIUSO" in p_trattamento
+            ):
+              slot_occupato = True
+              break
+            elif p_trattamento == "Pilates Duetto (in coppia)":
+              posti_occupati += 2
+            else:
+              posti_occupati += 1
+
+          impossibile_prenotare = False
+          if slot_occupato:
+            impossibile_prenotare = True
+          elif trattamento == "Pilates Duetto (in coppia)" and posti_occupati > 0:
+            impossibile_prenotare = True
+          elif trattamento != "Pilates Duetto (in coppia)" and posti_occupati >= 2:
+            impossibile_prenotare = True
+
+          if impossibile_prenotare:
             st.error(
-                "⚠️ Spiacenti, questo orario è stato appena occupato! Riprova"
-                " con un altro orario."
+                "⚠️ Spiacenti, questo orario non ha più disponibilità per il"
+                " trattamento scelto (potrebbe essere stato appena occupato)!"
+                " Riprova con un altro orario."
             )
             conn.close()
           else:
