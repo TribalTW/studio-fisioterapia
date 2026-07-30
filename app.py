@@ -13,7 +13,7 @@ st.set_page_config(
     layout="centered",
 )
 
-# Stile CSS e Script JavaScript avanzato (LocalStorage + Sincronizzazione URL obbligatoria)
+# Stile CSS e Script JavaScript avanzato (LocalStorage + Sincronizzazione URL)
 st.markdown(
     """
     <style>
@@ -122,22 +122,11 @@ def init_db():
 
 init_db()
 
-# --- BLOCCO DI SICUREZZA PREVENTIVO (Impedisce l'avvio se manca il dev_id) ---
-if "dev_id" not in st.query_params or not st.query_params["dev_id"].strip():
-  st.markdown(
-      """
-        <div style="text-align: center; margin-top: 100px;">
-            <h3>Caricamento in corso... 🧘‍♀️</h3>
-            <p>Verifica sicurezza dispositivo in corso...</p>
-        </div>
-    """,
-      unsafe_allow_html=True,
-  )
-  st.stop()
 
-
-# Identificazione dispositivo blindata tramite parametri URL sincronizzati
+# Identificazione dispositivo tramite parametri URL sincronizzati con localStorage
 def get_client_ip():
+  if "dev_id" not in st.query_params or not st.query_params["dev_id"].strip():
+    return "device_temp"
   return f"device_{st.query_params['dev_id']}"
 
 
@@ -442,6 +431,10 @@ else:
   conn.close()
 
   if is_banned:
+    if logo_path:
+      c1, c2, c3 = st.columns([1, 2, 1])
+      with c2:
+        st.image(logo_path, use_container_width=True)
     st.error(
         "⛔ Accesso negato: questo dispositivo è stato bloccato per"
         " violazione delle regole del servizio."
@@ -623,9 +616,6 @@ else:
           elif trattamento == "Pilates Duetto (in coppia)" and posti_occupati > 0:
             impossibile_prenotare = True
           elif trattamento != "Pilates Duetto (in coppia)" and posti_occupati >= 2:
-            impossibile_preventiva = (
-                True  # o impossibile_prenotare = True
-            )
             impossibile_prenotare = True
 
           if impossibile_prenotare:
