@@ -14,7 +14,7 @@ st.set_page_config(
     layout="centered",
 )
 
-# Inizializzazione Controller Cookie per persistenza reale del dispositivo in locale
+# Inizializzazione Controller Cookie per persistenza reale del dispositivo
 controller = CookieController()
 
 # Stile CSS con riquadro personalizzato (#fca4c3) sia per il cliente che per l'admin
@@ -112,28 +112,11 @@ init_db()
 
 # Funzione avanzata per ricavare l'identificativo client tramite Cookie persistenti
 def get_client_ip():
-  ip = "127.0.0.1"
-  try:
-    if hasattr(st, "context") and hasattr(st.context, "headers"):
-      forwarded = st.context.headers.get("X-Forwarded-For", "")
-      if forwarded:
-        ip = forwarded.split(",")[0].strip()
-      else:
-        remote_addr = st.context.headers.get("Remote-Addr", "")
-        if remote_addr:
-          ip = remote_addr
-  except Exception:
-    pass
-
-  # Se siamo in locale, usiamo un cookie persistente nel browser del telefono
-  if ip == "127.0.0.1":
-    device_id = controller.get("dev_device_id")
-    if not device_id:
-      device_id = str(uuid.uuid4())[:8]
-      controller.set("dev_device_id", device_id, max_age=365 * 24 * 60 * 60)
-    return f"local_device_{device_id}"
-
-  return ip
+  device_id = controller.get("client_unique_id")
+  if not device_id:
+    device_id = str(uuid.uuid4())[:12]
+    controller.set("client_unique_id", device_id, max_age=365 * 24 * 60 * 60)
+  return f"browser_cookie_{device_id}"
 
 
 # Cerca se esiste il file del logo
