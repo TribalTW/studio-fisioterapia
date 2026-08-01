@@ -7,7 +7,7 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
-# Cerca subito se esiste il file del logo
+# Cerca se esiste il file del logo
 logo_path = None
 for possible_name in [
     "logo.png",
@@ -27,7 +27,7 @@ st.set_page_config(
     layout="centered",
 )
 
-# Conversione del logo in Base64 per icone e manifest mobile
+# Conversione del logo in Base64 per le favicon web e scorciatoie
 logo_base64 = ""
 if logo_path:
   try:
@@ -36,51 +36,20 @@ if logo_path:
   except Exception:
     pass
 
-# Iniezione PWA Manifest e Icone per Android e iOS
 if logo_base64:
-  manifest_json = f"""{{
-        "name": "Postura & Pilates",
-        "short_name": "Postura & Pilates",
-        "start_url": "/",
-        "display": "standalone",
-        "background_color": "#ffffff",
-        "theme_color": "#D81B60",
-        "icons": [
-            {{
-                "src": "data:image/png;base64,{logo_base64}",
-                "sizes": "512x512",
-                "type": "image/png"
-            }}
-        ]
-    }}"""
   st.markdown(
       f"""
     <link rel="apple-touch-icon" href="data:image/png;base64,{logo_base64}">
     <link rel="icon" href="data:image/png;base64,{logo_base64}">
-    <link rel="manifest" href='data:application/manifest+json;charset=utf-8,{manifest_json}'>
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Postura & Pilates">
     <meta name="theme-color" content="#D81B60">
     """,
       unsafe_allow_html=True,
   )
 
-# Foglio di stile CSS pulito
+# Stile CSS della pagina (pulito e senza box rosa forzati)
 st.markdown(
     """
     <style>
-    div.stVerticalBlockBorderWrapper, div[data-testid="stVerticalBlockBorderWrapper"] {
-        background-color: #fca4c3 !important;
-        border: 1px solid #e882a4 !important;
-        border-radius: 16px !important;
-        padding: 20px !important;
-    }
-    
-    div[data-testid="stVerticalBlockBorderWrapper"] div {
-        background-color: transparent !important;
-    }
-    
     .stTextInput input, .stSelectbox > div > div, .stDateInput input, .stNumberInput input {
         background-color: #FFFFFF !important;
         border-radius: 8px !important;
@@ -120,7 +89,7 @@ st.markdown(
 )
 
 
-# Inizializzazione Database SQLite
+# Inizializzazione Database SQLite con supporto Device ID e Blacklist
 def init_db():
   conn = sqlite3.connect("prenotazioni.db")
   c = conn.cursor()
@@ -152,7 +121,7 @@ def init_db():
 init_db()
 
 
-# Identificazione univoca persistente tramite LocalStorage
+# Identificazione univoca persistente tramite LocalStorage con schermata di caricamento e anti-cache
 def get_client_device_id():
   if "dev_id" not in st.query_params or not st.query_params["dev_id"].strip():
     components.html(
@@ -178,13 +147,15 @@ def get_client_device_id():
   return f"device_{st.query_params['dev_id']}"
 
 
-# --- BARRA LATERALE UNICA E PULITA (Admin & Logo) ---
+# --- BARRA LATERALE (Admin & Logo) ---
 if logo_path:
   st.sidebar.image(logo_path, use_container_width=True)
 
 st.sidebar.title("🔐 Area Riservata (Admin)")
+
 ADMIN_PASSWORD = "MiaPassword2026!"
 
+# Gestione dello stato di Login Admin
 if "admin_logged_in" not in st.session_state:
   st.session_state["admin_logged_in"] = False
 
@@ -197,7 +168,9 @@ if not st.session_state["admin_logged_in"]:
     st.rerun()
   elif admin_pass != "":
     st.sidebar.error("Password errata!")
-else:
+
+# Pulsante di Logout se l'admin è collegato
+if st.session_state["admin_logged_in"]:
   st.sidebar.success("Accesso Admin attivo")
   if st.sidebar.button("🚪 Esci dall'Area Admin"):
     st.session_state["admin_logged_in"] = False
@@ -701,16 +674,17 @@ else:
 
       with st.container(border=True):
         st.markdown(
-            "📱 **Aggiungi l'App alla Schermata Home del Telefono!**"
+            "📱 **Aggiungi l'App alla Schermata Home con il tuo Logo!**"
         )
         st.write(
-            "Scannerizza il QR code dello studio per aprire l'app, poi segui"
-            " queste semplici istruzioni per averla sempre a portata di"
-            " mano con l'icona personalizzata dello studio:"
+            "Per avere l'app sempre a portata di mano con la tua icona"
+            " personalizzata, non usare il tasto automatico 'Installa' di"
+            " Streamlit (che mostra il logo standard), ma segui la funzione"
+            " nativa del browser:"
         )
         st.markdown("""
-            * **Su iPhone (Safari):** Tocca il pulsante di condivisione (il quadrato con la freccia in sù) e seleziona **"Aggiungi a Home"**.
-            * **Su Android (Chrome):** Tocca i tre puntini in alto a destra e seleziona **"Aggiungi a schermata Home"** o **"Installa app"**.
+            * **Su iPhone (Safari):** Tocca il pulsante di condivisione (quadrato con la freccia) e seleziona **"Aggiungi a Home"**.
+            * **Su Android (Chrome):** Tocca i tre puntini in alto a destra nel browser e seleziona **"Aggiungi a schermata Home"**.
             """)
 
     # TAB 3: DOVE SIAMO
