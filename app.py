@@ -677,7 +677,7 @@ else:
             st.write("📍 **Indirizzo:** Inserisci qui l'indirizzo dello studio")
             st.markdown(
                 "📞 **Telefono / WhatsApp:** [+39 345"
-                " 9472853](tel:+393459472853) o [Scrivici su"
+                " 9472853](tel:+393459472853) o [Scrivimi su"
                 " WhatsApp](https://wa.me/393459472853)"
             )
 
