@@ -147,32 +147,35 @@ def get_client_device_id():
   return f"device_{st.query_params['dev_id']}"
 
 
-# --- BARRA LATERALE UNIFICATA (Admin & Logo) ---
+# Gestione stato login admin inizializzato prima della sidebar
+if "admin_logged_in" not in st.session_state:
+  st.session_state["admin_logged_in"] = False
+
+# --- BARRA LATERALE CON UNA SOLA TENDINA PER L'AREA RISERVATA ---
 with st.sidebar:
   if logo_path:
     st.image(logo_path, use_container_width=True)
 
-  st.markdown("### 🔐 Area Riservata (Admin)")
+  # Unica tendina (expander) per l'Area Riservata (resta aperta se loggato, chiusa se disconnesso)
+  with st.expander(
+      "🔐 Area Riservata (Admin)", expanded=st.session_state["admin_logged_in"]
+  ):
+    ADMIN_PASSWORD = "MiaPassword2026!"
 
-  ADMIN_PASSWORD = "MiaPassword2026!"
-
-  if "admin_logged_in" not in st.session_state:
-    st.session_state["admin_logged_in"] = False
-
-  if not st.session_state["admin_logged_in"]:
-    admin_pass = st.text_input(
-        "Password Admin", type="password", key="admin_pwd_input"
-    )
-    if admin_pass == ADMIN_PASSWORD:
-      st.session_state["admin_logged_in"] = True
-      st.rerun()
-    elif admin_pass != "":
-      st.error("Password errata!")
-  else:
-    st.success("Accesso Admin attivo")
-    if st.button("🚪 Esci dall'Area Admin"):
-      st.session_state["admin_logged_in"] = False
-      st.rerun()
+    if not st.session_state["admin_logged_in"]:
+      admin_pass = st.text_input(
+          "Password Admin", type="password", key="admin_pwd_input"
+      )
+      if admin_pass == ADMIN_PASSWORD:
+        st.session_state["admin_logged_in"] = True
+        st.rerun()
+      elif admin_pass != "":
+        st.error("Password errata!")
+    else:
+      st.success("Accesso Admin attivo")
+      if st.button("🚪 Esci dall'Area Admin"):
+        st.session_state["admin_logged_in"] = False
+        st.rerun()
 
 
 # --- VISTA 1: PANNELLO AMMINISTRATORE ---
