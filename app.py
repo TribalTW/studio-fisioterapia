@@ -1,3 +1,4 @@
+import base64
 from datetime import datetime
 import os
 import sqlite3
@@ -13,28 +14,61 @@ st.set_page_config(
     layout="centered",
 )
 
-# Stile CSS della pagina
+# Cerca se esiste il file del logo
+logo_path = None
+for possible_name in [
+    "logo.png",
+    "logo.PNG",
+    "logo.jpg",
+    "logo.jpeg",
+    "logo.png.png",
+]:
+  if os.path.exists(possible_name):
+    logo_path = possible_name
+    break
+
+# Conversione del logo in Base64 per usarlo come Icona nativa dell'App mobile
+logo_base64 = ""
+if logo_path:
+  try:
+    with open(logo_path, "rb") as img_file:
+      logo_base64 = base64.b64encode(img_file.read()).decode("utf-8")
+  except Exception:
+    pass
+
+icon_tag = (
+    f'<link rel="apple-touch-icon" href="data:image/png;base64,{logo_base64}">'
+    f'<link rel="icon" href="data:image/png;base64,{logo_base64}">'
+    if logo_base64
+    else ""
+)
+
 st.markdown(
-    """
+    f"""
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Postura & Pilates">
+    <meta name="theme-color" content="#D81B60">
+    {icon_tag}
     <style>
-    div.stVerticalBlockBorderWrapper, div[data-testid="stVerticalBlockBorderWrapper"] {
+    div.stVerticalBlockBorderWrapper, div[data-testid="stVerticalBlockBorderWrapper"] {{
         background-color: #fca4c3 !important;
         border: 1px solid #e882a4 !important;
         border-radius: 16px !important;
         padding: 20px !important;
-    }
+    }}
     
-    div[data-testid="stVerticalBlockBorderWrapper"] div {
+    div[data-testid="stVerticalBlockBorderWrapper"] div {{
         background-color: transparent !important;
-    }
+    }}
     
-    .stTextInput input, .stSelectbox > div > div, .stDateInput input, .stNumberInput input {
+    .stTextInput input, .stSelectbox > div > div, .stDateInput input, .stNumberInput input {{
         background-color: #FFFFFF !important;
         border-radius: 8px !important;
         border: 1px solid #E0E0E0 !important;
-    }
+    }}
     
-    div.stButton > button {
+    div.stButton > button {{
         background-color: #D81B60 !important;
         color: white !important;
         border-radius: 10px !important;
@@ -44,23 +78,23 @@ st.markdown(
         width: 100% !important;
         padding: 10px 20px !important;
         margin-top: 5px !important;
-    }
+    }}
     
-    div.stButton > button:hover {
+    div.stButton > button:hover {{
         background-color: #C2185B !important;
-    }
+    }}
     
-    h1, h2, h3 {
+    h1, h2, h3 {{
         color: #880E4F !important;
         text-align: center;
-    }
+    }}
     
-    .stCaption, p {
+    .stCaption, p {{
         text-align: center;
-    }
+    }}
     
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
+    #MainMenu {{visibility: hidden;}}
+    footer {{visibility: hidden;}}
     </style>
 """,
     unsafe_allow_html=True,
@@ -123,20 +157,6 @@ def get_client_device_id():
     )
     st.stop()
   return f"device_{st.query_params['dev_id']}"
-
-
-# Cerca se esiste il file del logo
-logo_path = None
-for possible_name in [
-    "logo.png",
-    "logo.PNG",
-    "logo.jpg",
-    "logo.jpeg",
-    "logo.png.png",
-]:
-  if os.path.exists(possible_name):
-    logo_path = possible_name
-    break
 
 
 # --- BARRA LATERALE (Admin & Logo) ---
@@ -663,6 +683,26 @@ else:
           "Benvenuti nello studio della **Dott.ssa Roberta Sinagra**,"
           " specializzato in Posturologia e Pilates."
       )
+
+      with st.container(border=True):
+        st.markdown(
+            "📱 **Aggiungi l'App alla Schermata Home del Telefono!**"
+        )
+        st.write(
+            "Scannerizza il QR code dello studio per aprire l'app, poi segui"
+            " queste semplici istruzioni per averla sempre a portata di"
+            " mano con l'icona personalizzata dello studio:"
+        )
+        st.markdown(
+            "* **Su iPhone (Safari):** Tocca il pulsante di condivisione"
+            ' (il quadrato con la freccia in sù) e seleziona **"Aggiungi a'
+            ' Home"**.'
+        )
+        st.markdown(
+            "* **Su Android (Chrome):** Tocca i tre puntini in alto a destra e'
+            ' seleziona **"Aggiungi a schermata Home"** o **"Installa'
+            ' app"**.'
+        )
 
     # TAB 3: DOVE SIAMO
     with tab3:
