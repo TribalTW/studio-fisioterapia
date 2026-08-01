@@ -36,39 +36,42 @@ if logo_path:
   except Exception:
     pass
 
-icon_tag = (
-    f'<link rel="apple-touch-icon" href="data:image/png;base64,{logo_base64}">'
-    f'<link rel="icon" href="data:image/png;base64,{logo_base64}">'
-    if logo_base64
-    else ""
-)
-
-st.markdown(
-    f"""
+# 1. Iniezione pulita dei tag mobile e dell'icona (separata dal CSS)
+if logo_base64:
+  st.markdown(
+      f"""
+    <link rel="apple-touch-icon" href="data:image/png;base64,{logo_base64}">
+    <link rel="icon" href="data:image/png;base64,{logo_base64}">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Postura & Pilates">
     <meta name="theme-color" content="#D81B60">
-    {icon_tag}
+    """,
+      unsafe_allow_html=True,
+  )
+
+# 2. Foglio di stile CSS isolato e sicuro
+st.markdown(
+    """
     <style>
-    div.stVerticalBlockBorderWrapper, div[data-testid="stVerticalBlockBorderWrapper"] {{
+    div.stVerticalBlockBorderWrapper, div[data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #fca4c3 !important;
         border: 1px solid #e882a4 !important;
         border-radius: 16px !important;
         padding: 20px !important;
-    }}
+    }
     
-    div[data-testid="stVerticalBlockBorderWrapper"] div {{
+    div[data-testid="stVerticalBlockBorderWrapper"] div {
         background-color: transparent !important;
-    }}
+    }
     
-    .stTextInput input, .stSelectbox > div > div, .stDateInput input, .stNumberInput input {{
+    .stTextInput input, .stSelectbox > div > div, .stDateInput input, .stNumberInput input {
         background-color: #FFFFFF !important;
         border-radius: 8px !important;
         border: 1px solid #E0E0E0 !important;
-    }}
+    }
     
-    div.stButton > button {{
+    div.stButton > button {
         background-color: #D81B60 !important;
         color: white !important;
         border-radius: 10px !important;
@@ -78,23 +81,23 @@ st.markdown(
         width: 100% !important;
         padding: 10px 20px !important;
         margin-top: 5px !important;
-    }}
+    }
     
-    div.stButton > button:hover {{
+    div.stButton > button:hover {
         background-color: #C2185B !important;
-    }}
+    }
     
-    h1, h2, h3 {{
+    h1, h2, h3 {
         color: #880E4F !important;
         text-align: center;
-    }}
+    }
     
-    .stCaption, p {{
+    .stCaption, p {
         text-align: center;
-    }}
+    }
     
-    #MainMenu {{visibility: hidden;}}
-    footer {{visibility: hidden;}}
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
     </style>
 """,
     unsafe_allow_html=True,
