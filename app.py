@@ -20,14 +20,14 @@ for possible_name in [
     logo_path = possible_name
     break
 
-# Configurazione Pagina (usiamo il logo reale come favicon così Android lo aggancia come icona)
+# Configurazione Pagina
 st.set_page_config(
     page_title="Postura & Pilates - Dott.ssa Roberta Sinagra",
     page_icon=logo_path if logo_path else "🧘‍♀️",
     layout="centered",
 )
 
-# Conversione del logo in Base64 per i meta tag mobile
+# Conversione del logo in Base64 per icone e manifest mobile
 logo_base64 = ""
 if logo_path:
   try:
@@ -36,12 +36,28 @@ if logo_path:
   except Exception:
     pass
 
-# 1. Iniezione pulita dei tag mobile e dell'icona (separata dal CSS)
+# Iniezione PWA Manifest e Icone per Android e iOS
 if logo_base64:
+  manifest_json = f"""{{
+        "name": "Postura & Pilates",
+        "short_name": "Postura & Pilates",
+        "start_url": "/",
+        "display": "standalone",
+        "background_color": "#ffffff",
+        "theme_color": "#D81B60",
+        "icons": [
+            {{
+                "src": "data:image/png;base64,{logo_base64}",
+                "sizes": "512x512",
+                "type": "image/png"
+            }}
+        ]
+    }}"""
   st.markdown(
       f"""
     <link rel="apple-touch-icon" href="data:image/png;base64,{logo_base64}">
     <link rel="icon" href="data:image/png;base64,{logo_base64}">
+    <link rel="manifest" href='data:application/manifest+json;charset=utf-8,{manifest_json}'>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Postura & Pilates">
@@ -50,7 +66,7 @@ if logo_base64:
       unsafe_allow_html=True,
   )
 
-# 2. Foglio di stile CSS isolato e sicuro
+# Foglio di stile CSS pulito
 st.markdown(
     """
     <style>
@@ -104,7 +120,7 @@ st.markdown(
 )
 
 
-# Inizializzazione Database SQLite con supporto Device ID e Blacklist
+# Inizializzazione Database SQLite
 def init_db():
   conn = sqlite3.connect("prenotazioni.db")
   c = conn.cursor()
@@ -136,7 +152,7 @@ def init_db():
 init_db()
 
 
-# Identificazione univoca persistente tramite LocalStorage con schermata di caricamento e anti-cache
+# Identificazione univoca persistente tramite LocalStorage
 def get_client_device_id():
   if "dev_id" not in st.query_params or not st.query_params["dev_id"].strip():
     components.html(
@@ -162,15 +178,13 @@ def get_client_device_id():
   return f"device_{st.query_params['dev_id']}"
 
 
-# --- BARRA LATERALE (Admin & Logo) ---
+# --- BARRA LATERALE UNICA E PULITA (Admin & Logo) ---
 if logo_path:
   st.sidebar.image(logo_path, use_container_width=True)
 
 st.sidebar.title("🔐 Area Riservata (Admin)")
-
 ADMIN_PASSWORD = "MiaPassword2026!"
 
-# Gestione dello stato di Login Admin
 if "admin_logged_in" not in st.session_state:
   st.session_state["admin_logged_in"] = False
 
@@ -183,9 +197,7 @@ if not st.session_state["admin_logged_in"]:
     st.rerun()
   elif admin_pass != "":
     st.sidebar.error("Password errata!")
-
-# Pulsante di Logout se l'admin è collegato
-if st.session_state["admin_logged_in"]:
+else:
   st.sidebar.success("Accesso Admin attivo")
   if st.sidebar.button("🚪 Esci dall'Area Admin"):
     st.session_state["admin_logged_in"] = False
