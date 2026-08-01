@@ -1,4 +1,3 @@
-import base64
 from datetime import datetime
 import os
 import sqlite3
@@ -7,49 +6,28 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
-# Cerca se esiste il file del logo
-logo_path = None
-for possible_name in [
-    "logo.png",
-    "logo.PNG",
-    "logo.jpg",
-    "logo.jpeg",
-    "logo.png.png",
-]:
-  if os.path.exists(possible_name):
-    logo_path = possible_name
-    break
-
 # Configurazione Pagina
 st.set_page_config(
     page_title="Postura & Pilates - Dott.ssa Roberta Sinagra",
-    page_icon=logo_path if logo_path else "🧘‍♀️",
+    page_icon="🧘‍♀️",
     layout="centered",
 )
 
-# Conversione del logo in Base64 per le favicon web e scorciatoie
-logo_base64 = ""
-if logo_path:
-  try:
-    with open(logo_path, "rb") as img_file:
-      logo_base64 = base64.b64encode(img_file.read()).decode("utf-8")
-  except Exception:
-    pass
-
-if logo_base64:
-  st.markdown(
-      f"""
-    <link rel="apple-touch-icon" href="data:image/png;base64,{logo_base64}">
-    <link rel="icon" href="data:image/png;base64,{logo_base64}">
-    <meta name="theme-color" content="#D81B60">
-    """,
-      unsafe_allow_html=True,
-  )
-
-# Stile CSS della pagina (pulito e senza box rosa forzati)
+# Stile CSS della pagina
 st.markdown(
     """
     <style>
+    div.stVerticalBlockBorderWrapper, div[data-testid="stVerticalBlockBorderWrapper"] {
+        background-color: #fca4c3 !important;
+        border: 1px solid #e882a4 !important;
+        border-radius: 16px !important;
+        padding: 20px !important;
+    }
+    
+    div[data-testid="stVerticalBlockBorderWrapper"] div {
+        background-color: transparent !important;
+    }
+    
     .stTextInput input, .stSelectbox > div > div, .stDateInput input, .stNumberInput input {
         background-color: #FFFFFF !important;
         border-radius: 8px !important;
@@ -145,6 +123,20 @@ def get_client_device_id():
     )
     st.stop()
   return f"device_{st.query_params['dev_id']}"
+
+
+# Cerca se esiste il file del logo
+logo_path = None
+for possible_name in [
+    "logo.png",
+    "logo.PNG",
+    "logo.jpg",
+    "logo.jpeg",
+    "logo.png.png",
+]:
+  if os.path.exists(possible_name):
+    logo_path = possible_name
+    break
 
 
 # --- BARRA LATERALE (Admin & Logo) ---
@@ -671,21 +663,6 @@ else:
           "Benvenuti nello studio della **Dott.ssa Roberta Sinagra**,"
           " specializzato in Posturologia e Pilates."
       )
-
-      with st.container(border=True):
-        st.markdown(
-            "📱 **Aggiungi l'App alla Schermata Home con il tuo Logo!**"
-        )
-        st.write(
-            "Per avere l'app sempre a portata di mano con la tua icona"
-            " personalizzata, non usare il tasto automatico 'Installa' di"
-            " Streamlit (che mostra il logo standard), ma segui la funzione"
-            " nativa del browser:"
-        )
-        st.markdown("""
-            * **Su iPhone (Safari):** Tocca il pulsante di condivisione (quadrato con la freccia) e seleziona **"Aggiungi a Home"**.
-            * **Su Android (Chrome):** Tocca i tre puntini in alto a destra nel browser e seleziona **"Aggiungi a schermata Home"**.
-            """)
 
     # TAB 3: DOVE SIAMO
     with tab3:
