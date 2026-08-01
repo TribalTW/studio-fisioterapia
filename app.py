@@ -7,14 +7,7 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
-# Configurazione Pagina
-st.set_page_config(
-    page_title="Postura & Pilates - Dott.ssa Roberta Sinagra",
-    page_icon="🧘‍♀️",
-    layout="centered",
-)
-
-# Cerca se esiste il file del logo
+# Cerca subito se esiste il file del logo
 logo_path = None
 for possible_name in [
     "logo.png",
@@ -27,7 +20,14 @@ for possible_name in [
     logo_path = possible_name
     break
 
-# Conversione del logo in Base64 per usarlo come Icona nativa dell'App mobile
+# Configurazione Pagina (usiamo il logo reale come favicon così Android lo aggancia come icona)
+st.set_page_config(
+    page_title="Postura & Pilates - Dott.ssa Roberta Sinagra",
+    page_icon=logo_path if logo_path else "🧘‍♀️",
+    layout="centered",
+)
+
+# Conversione del logo in Base64 per i meta tag mobile
 logo_base64 = ""
 if logo_path:
   try:
@@ -693,16 +693,10 @@ else:
             " queste semplici istruzioni per averla sempre a portata di"
             " mano con l'icona personalizzata dello studio:"
         )
-        st.markdown(
-            "* **Su iPhone (Safari):** Tocca il pulsante di condivisione"
-            ' (il quadrato con la freccia in sù) e seleziona **"Aggiungi a'
-            ' Home"**.'
-        )
-        st.markdown(
-            "* **Su Android (Chrome):** Tocca i tre puntini in alto a destra e'
-            ' seleziona **"Aggiungi a schermata Home"** o **"Installa'
-            ' app"**.'
-        )
+        st.markdown("""
+            * **Su iPhone (Safari):** Tocca il pulsante di condivisione (il quadrato con la freccia in sù) e seleziona **"Aggiungi a Home"**.
+            * **Su Android (Chrome):** Tocca i tre puntini in alto a destra e seleziona **"Aggiungi a schermata Home"** o **"Installa app"**.
+            """)
 
     # TAB 3: DOVE SIAMO
     with tab3:
