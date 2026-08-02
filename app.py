@@ -1,6 +1,7 @@
 from datetime import datetime
 import os
 import sqlite3
+import uuid
 from zoneinfo import ZoneInfo
 import pandas as pd
 import streamlit as st
@@ -136,38 +137,18 @@ def get_orari_per_data(data):
         ]
 
 
-# Identificazione univoca sicura con gestione fallback per privacy/incognito
+# Identificazione univoca nativa tramite Streamlit (Senza blocchi iframe)
 def get_client_device_id():
-    if "dev_id" not in st.query_params or not st.query_params["dev_id"].strip():
-        components.html(
-            """
-        <div style="display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #fff0f5;">
-            <h3 style="color: #880E4F; font-family: sans-serif;">Caricamento studio in corso... 🧘‍♀️</h3>
-        </div>
-        <script>
-        let devId;
-        try {
-            devId = localStorage.getItem('pilates_dev_id');
-            if (!devId) {
-                devId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-                localStorage.setItem('pilates_dev_id', devId);
-            }
-        } catch (e) {
-            devId = 'fallback_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-        }
-        
-        const urlParams = new URLSearchParams(window.parent.location.search);
-        if (!urlParams.has('dev_id') || urlParams.get('dev_id') !== devId) {
-            urlParams.set('dev_id', devId);
-            window.parent.location.href = window.parent.location.pathname + '?' + urlParams.toString();
-        }
-        </script>
-        """,
-            height=650,
-            width=None,
-        )
-        st.stop()
-    return f"device_{st.query_params['dev_id']}"
+    if "device_id_internale" not in st.session_state:
+        if "dev_id" in st.query_params and st.query_params["dev_id"].strip():
+            st.session_state["device_id_internale"] = (
+                f"device_{st.query_params['dev_id']}"
+            )
+        else:
+            unique_id = str(uuid.uuid4()).replace("-", "")[:24]
+            st.query_params["dev_id"] = unique_id
+            st.session_state["device_id_internale"] = f"device_{unique_id}"
+    return st.session_state["device_id_internale"]
 
 
 # Cerca se esiste il file del logo
