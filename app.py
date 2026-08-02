@@ -1,5 +1,6 @@
 from datetime import datetime, time, timedelta
 import os
+import random
 import sqlite3
 import uuid
 from zoneinfo import ZoneInfo
@@ -68,7 +69,7 @@ st.markdown(
 )
 
 
-# Inizializzazione Database SQLite con supporto Device ID, Blacklist e Presenze (Default: Assente)
+# Inizializzazione Database SQLite con supporto PIN di sicurezza
 def init_db():
     conn = sqlite3.connect("prenotazioni.db")
     c = conn.cursor()
@@ -81,7 +82,8 @@ def init_db():
             trattamento TEXT NOT NULL,
             data_creazione TEXT NOT NULL,
             device_id TEXT,
-            stato_presenza TEXT DEFAULT 'Assente'
+            stato_presenza TEXT DEFAULT 'Assente',
+            pin TEXT
         )
     """)
     try:
@@ -94,6 +96,11 @@ def init_db():
             "ALTER TABLE prenotazioni ADD COLUMN stato_presenza TEXT DEFAULT"
             " 'Assente'"
         )
+    except sqlite3.OperationalError:
+        pass
+
+    try:
+        c.execute("ALTER TABLE prenotazioni ADD COLUMN pin TEXT")
     except sqlite3.OperationalError:
         pass
 
@@ -214,10 +221,10 @@ if st.session_state["admin_logged_in"]:
 
     # 1. TABELLA APPUNTAMENTI
     with st.container(border=True):
-        st.subheader("📋 Elenco Prenotazioni & Presenze")
+        st.subheader("📋 Elenco Prenotazioni, PIN & Presenze")
         conn = sqlite3.connect("prenotazioni.db")
         df = pd.read_sql_query(
-            "SELECT id, nome, data, ora, trattamento, stato_presenza, data_creazione, device_id FROM prenotazioni ORDER BY data DESC, ora ASC",
+            "SELECT id, nome, data, ora, trattamento, stato_presenza, pin, data_creazione, device_id FROM prenotazioni ORDER BY data DESC, ora ASC",
             conn,
         )
         conn.close()
@@ -354,7 +361,7 @@ if st.session_state["admin_logged_in"]:
         st.subheader("📷 QR Code Check-in Ingresso Studio")
         st.write(
             "Mostra o stampa questo QR code da posizionare all'ingresso dello studio. "
-            "Quando un cliente arriva e inquadra il QR code con il telefono, la sua app registrerà immediatamente la presenza!"
+            "Quando un cliente arriva e inquadra il QR code con il telefono, inserirà il proprio PIN per registrare la presenza!"
         )
 
         components.html(
@@ -460,7 +467,7 @@ if st.session_state["admin_logged_in"]:
                             if not c.fetchone():
                                 c.execute(
                                     "INSERT INTO prenotazioni (nome, data, ora, trattamento,"
-                                    " data_creazione, device_id, stato_presenza) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                                    " data_creazione, device_id, stato_presenza, pin) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                                     (
                                         "🔒 STUDIO CHIUSO",
                                         d_str,
@@ -469,6 +476,7 @@ if st.session_state["admin_logged_in"]:
                                         datetime.now().strftime("%Y-%m-%d %H:%M"),
                                         "SYSTEM",
                                         "Chiuso",
+                                        "0000",
                                     ),
                                 )
                     else:
@@ -479,7 +487,7 @@ if st.session_state["admin_logged_in"]:
                         if not c.fetchone():
                             c.execute(
                                 "INSERT INTO prenotazioni (nome, data, ora, trattamento,"
-                                " data_creazione, device_id, stato_presenza) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                                " data_creazione, device_id, stato_presenza, pin) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                                 (
                                     "🔒 ORARIO CHIUSO",
                                     d_str,
@@ -488,6 +496,7 @@ if st.session_state["admin_logged_in"]:
                                     datetime.now().strftime("%Y-%m-%d %H:%M"),
                                     "SYSTEM",
                                     "Chiuso",
+                                    "0000",
                                 ),
                             )
                 st.success("Blocco applicato con successo per le date selezionate!")
@@ -641,7 +650,7 @@ else:
             " violazione delle regole del servizio."
         )
     else:
-        # GESTIONE CHECK-IN AUTOMATICO TRAMITE QR CODE SCAN (VERIFICA NOME E ORARIO)
+        # GESTIONE CHECK-IN AUTOMATICO TRAMITE QR CODE SCAN (VERIFICA NOME, PIN E ORARIO)
         if st.query_params.get("action") == "checkin":
             if logo_path:
                 c1, c2, c3 = st.columns([1, 2, 1])
@@ -679,41 +688,52 @@ else:
             else:
                 with st.container(border=True):
                     st.markdown(
-                        "**Benvenuto/a in studio! 🧘‍♀️ Inserisci i tuoi dati per confermare l'arrivo:**"
+                        "**Benvenuto/a in studio! 🧘‍♀️ Inserisci i tuoi dati e il PIN segreto per confermare l'arrivo:**"
                     )
                     with st.form("form_checkin_cliente_sicuro"):
                         nome_inserito = st.text_input(
-                            "Inserisci il tuo Nome e Cognome esatto *"
+                            "Inserisci Nome e Cognome esatti *"
+                        )
+                        pin_inserito = st.text_input(
+                            "Inserisci il tuo PIN segreto a 4 cifre *",
+                            type="password",
                         )
                         submit_checkin = st.form_submit_button(
                             "✅ Conferma la mia Presenza"
                         )
 
                         if submit_checkin:
-                            if not nome_inserito.strip():
+                            nome_pulito = nome_inserito.strip()
+                            pin_pulito = pin_inserito.strip()
+
+                            if not nome_pulito or not pin_pulito:
                                 st.error(
-                                    "Per favore, inserisci il tuo nome e cognome."
+                                    "Per favore, inserisci sia il nome e cognome che il PIN segreto."
                                 )
                             else:
-                                # Cerchiamo nel database gli appuntamenti di oggi per questo nome (case-insensitive)
+                                # CONTROLLO BLINDATO: Nome esatto + PIN esatto per la giornata odierna
                                 conn = sqlite3.connect("prenotazioni.db")
                                 c = conn.cursor()
                                 c.execute(
-                                    "SELECT id, nome, trattamento, ora, stato_presenza FROM prenotazioni WHERE data = ? AND device_id != 'SYSTEM' AND LOWER(nome) LIKE ?",
-                                    (
-                                        oggi_str,
-                                        f"%{nome_inserito.strip().lower()}%",
-                                    ),
+                                    """
+                                    SELECT id, nome, trattamento, ora, stato_presenza 
+                                    FROM prenotazioni 
+                                    WHERE data = ? 
+                                      AND device_id != 'SYSTEM' 
+                                      AND LOWER(nome) = ? 
+                                      AND pin = ?
+                                    """,
+                                    (oggi_str, nome_pulito.lower(), pin_pulito),
                                 )
                                 appuntamenti_trovati = c.fetchall()
                                 conn.close()
 
                                 if not appuntamenti_trovati:
                                     st.error(
-                                        f"❌ Nessuna prenotazione trovata oggi a nome di '{nome_inserito}'. Verifica di aver scritto correttamente il nome con cui hai prenotato."
+                                        "❌ Credenziali errate: nome o PIN segreto non corrispondono ad alcuna prenotazione attiva per oggi."
                                     )
                                 else:
-                                    # Filtriamo gli appuntamenti in base alla fascia oraria valida (consentiamo il check-in da 45 minuti prima fino a 30 minuti dopo l'orario prenotato)
+                                    # Filtriamo gli appuntamenti in base alla fascia oraria valida (da 45 min prima a 30 min dopo)
                                     appuntamento_valido = None
                                     for (
                                         p_id,
@@ -729,7 +749,6 @@ else:
                                             datetime.today(), ora_app
                                         )
 
-                                        # Finestra temporale: da 45 min prima a 30 min dopo
                                         inizio_finestra = (
                                             dt_app - timedelta(minutes=45)
                                         ).time()
@@ -961,8 +980,11 @@ else:
                         )
                         conn.close()
                     else:
+                        # Generazione PIN segreto a 4 cifre per la prenotazione
+                        pin_code = str(random.randint(1000, 9999))
+
                         c.execute(
-                            "INSERT INTO prenotazioni (nome, data, ora, trattamento, data_creazione, device_id, stato_presenza) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                            "INSERT INTO prenotazioni (nome, data, ora, trattamento, data_creazione, device_id, stato_presenza, pin) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                             (
                                 nome,
                                 str(data_scelta),
@@ -971,6 +993,7 @@ else:
                                 datetime.now().strftime("%Y-%m-%d %H:%M"),
                                 client_device_id,
                                 "Assente",
+                                pin_code,
                             ),
                         )
                         conn.commit()
@@ -978,7 +1001,10 @@ else:
 
                         data_formattata = data_scelta.strftime("%d/%m/%Y")
                         st.session_state["booking_success_msg"] = (
-                            f"🎉 PRENOTAZIONE CONFERMATA!\n\nGrazie {nome}, ti aspettiamo il {data_formattata} alle ore {ora_scelta} per {trattamento}."
+                            f"🎉 PRENOTAZIONE CONFERMATA!\n\n"
+                            f"Grazie {nome}, ti aspettiamo il {data_formattata} alle ore {ora_scelta} per {trattamento}.\n\n"
+                            f"🔑 **Il tuo PIN segreto per il check-in in studio:** `{pin_code}`\n"
+                            f"*(Conserva questo PIN: ti servirà per confermare l'arrivo in studio inquadrando il QR code).* "
                         )
                         st.session_state["reset_nome_flag"] = True
                         st.rerun()
