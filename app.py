@@ -67,7 +67,7 @@ st.markdown(
 )
 
 
-# Inizializzazione Database SQLite con supporto Device ID e Blacklist
+# Inizializzazione Database SQLite con supporto Device ID, Blacklist e Presenze (Default: Assente)
 def init_db():
     conn = sqlite3.connect("prenotazioni.db")
     c = conn.cursor()
@@ -79,11 +79,20 @@ def init_db():
             ora TEXT NOT NULL,
             trattamento TEXT NOT NULL,
             data_creazione TEXT NOT NULL,
-            device_id TEXT
+            device_id TEXT,
+            stato_presenza TEXT DEFAULT 'Assente'
         )
     """)
     try:
         c.execute("ALTER TABLE prenotazioni ADD COLUMN device_id TEXT")
+    except sqlite3.OperationalError:
+        pass
+
+    try:
+        c.execute(
+            "ALTER TABLE prenotazioni ADD COLUMN stato_presenza TEXT DEFAULT"
+            " 'Assente'"
+        )
     except sqlite3.OperationalError:
         pass
 
@@ -203,11 +212,10 @@ if st.session_state["admin_logged_in"]:
 
     # 1. TABELLA APPUNTAMENTI
     with st.container(border=True):
-        st.subheader("📋 Elenco Prenotazioni")
+        st.subheader("📋 Elenco Prenotazioni & Presenze")
         conn = sqlite3.connect("prenotazioni.db")
         df = pd.read_sql_query(
-            "SELECT id, nome, data, ora, trattamento, data_creazione, device_id FROM"
-            " prenotazioni ORDER BY data DESC, ora ASC",
+            "SELECT id, nome, data, ora, trattamento, stato_presenza, data_creazione, device_id FROM prenotazioni ORDER BY data DESC, ora ASC",
             conn,
         )
         conn.close()
@@ -217,7 +225,154 @@ if st.session_state["admin_logged_in"]:
         else:
             st.info("Nessuna prenotazione presente nel database.")
 
-    # 2. SEZIONE CHIUSURE E SBLOCCHI STUDIO
+    # 2. SEZIONE GESTIONE PRESENZE RAPIDA (CON CHECKBOX) & CODICE GESTIONALE
+    with st.container(border=True):
+        st.subheader("✅ Spunta Presenze Veloci & Codici Seduta")
+        st.write(
+            "Seleziona la data: i clienti partono di default come assenti. "
+            "**Metti la spunta solo a chi si è presentato** (oppure ci penserà il QR code in studio) e clicca salva per generare i codici seduta."
+        )
+
+        data_presenze = st.date_input(
+            "Data da verificare", value=datetime.today(), key="data_presenze_input"
+        )
+        data_presenze_str = str(data_presenze)
+
+        conn = sqlite3.connect("prenotazioni.db")
+        c = conn.cursor()
+        c.execute(
+            "SELECT id, nome, trattamento, ora, stato_presenza FROM prenotazioni WHERE data = ? AND device_id != 'SYSTEM' ORDER BY ora ASC",
+            (data_presenze_str,),
+        )
+        appuntamenti_giorno = c.fetchall()
+        conn.close()
+
+        if appuntamenti_giorno:
+            with st.form("form_presenze"):
+                st.markdown(
+                    f"**Appuntamenti del {data_presenze.strftime('%d/%m/%Y')}:**"
+                )
+                st.markdown(
+                    "<small style='color: gray;'>Metti la spunta per confermare la presenza. Chi non ha la spunta resterà registrato come assente.</small>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown("---")
+
+                presenze_dict = {}
+                for (
+                    app_id,
+                    nome_cli,
+                    tratt_cli,
+                    ora_cli,
+                    stato_attuale,
+                ) in appuntamenti_giorno:
+                    col_p1, col_p2 = st.columns([3, 2])
+                    is_checked_default = stato_attuale == "Presente"
+
+                    with col_p1:
+                        is_presente = st.checkbox(
+                            f"**{ora_cli}** - {nome_cli} <br><span style='color: #666; font-size: 0.9em;'>{tratt_cli}</span>",
+                            value=is_checked_default,
+                            key=f"pres_{app_id}",
+                        )
+                        presenze_dict[app_id] = (
+                            "Presente" if is_presente else "Assente"
+                        )
+
+                    with col_p2:
+                        if is_presente:
+                            codice_seduta = f"SEDUTA-OK-{app_id}-{data_presenze_str}"
+                            st.markdown(
+                                f"<code style='color: #D81B60; font-weight: bold;'>{codice_seduta}</code>",
+                                unsafe_allow_html=True,
+                            )
+                        else:
+                            st.markdown(
+                                "<span style='color: gray;'>Assente</span>",
+                                unsafe_allow_html=True,
+                            )
+
+                    st.markdown("---")
+
+                submit_presenze = st.form_submit_button(
+                    "💾 Salva Presenze & Genera Codici"
+                )
+                if submit_presenze:
+                    conn = sqlite3.connect("prenotazioni.db")
+                    c = conn.cursor()
+                    for app_id, nuovo_stato in presenze_dict.items():
+                        c.execute(
+                            "UPDATE prenotazioni SET stato_presenza = ? WHERE id = ?",
+                            (nuovo_stato, app_id),
+                        )
+                    conn.commit()
+                    conn.close()
+                    st.success("Presenze salvate con successo!")
+                    st.rerun()
+        else:
+            st.info(
+                "Nessun appuntamento cliente registrato per la data selezionata."
+            )
+
+        # SEZIONE STATISTICHE / TOTALE SEDUTE FATTE (GESTIONALE)
+        st.markdown("---")
+        st.markdown("#### 📈 Riepilogo e Calcolo Totale Sedute (Gestionale)")
+        if st.button("📊 Calcola Statistiche e Sedute Svolte per Cliente"):
+            conn = sqlite3.connect("prenotazioni.db")
+            df_stat = pd.read_sql_query(
+                """
+                SELECT nome, 
+                       COUNT(CASE WHEN stato_presenza = 'Presente' THEN 1 END) AS sedute_effettuate,
+                       COUNT(CASE WHEN stato_presenza = 'Assente' THEN 1 END) AS sedute_assenze,
+                       COUNT(*) AS totale_prenotazioni
+                FROM prenotazioni 
+                WHERE device_id != 'SYSTEM'
+                GROUP BY nome
+                ORDER BY sedute_effettuate DESC
+            """,
+                conn,
+            )
+            conn.close()
+            if not df_stat.empty:
+                st.dataframe(df_stat, use_container_width=True)
+                st.success(
+                    "💡 Questo report calcola automaticamente le sedute effettuate ed è pronto per essere esportato o collegato al futuro software gestionale!"
+                )
+            else:
+                st.info("Nastro dati insufficiente per le statistiche.")
+
+    # 3. SEZIONE QR CODE CHECK-IN STUDIO
+    with st.container(border=True):
+        st.subheader("📷 QR Code Check-in Ingresso Studio")
+        st.write(
+            "Mostra o stampa questo QR code da posizionare all'ingresso dello studio. "
+            "Quando un cliente arriva e inquadra il QR code con il telefono, la sua app registrerà immediatamente la presenza!"
+        )
+
+        components.html(
+            """
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; background: #ffffff; padding: 20px; border-radius: 12px; border: 2px dashed #D81B60;">
+            <h4 style="color: #880E4F; margin-bottom: 10px;">Inquadra per Check-in Studio 🧘‍♀️</h4>
+            <div id="qrcode" style="margin: 15px;"></div>
+            <p style="font-size: 12px; color: #555; text-align: center;">Inquadra con la fotocamera dello smartphone all'arrivo in studio.</p>
+        </div>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+        <script>
+        (function() {
+            var qr = new QRious({
+                element: document.createElement('canvas'),
+                value: window.location.origin + window.location.pathname + '?action=checkin',
+                size: 200
+            });
+            document.getElementById('qrcode').appendChild(qr.element);
+        })();
+        </script>
+        """,
+            height=320,
+            width=None,
+        )
+
+    # 4. SEZIONE CHIUSURE E SBLOCCHI STUDIO
     with st.container(border=True):
         st.subheader("🔒🔓 Gestione Chiusure e Sblocchi Studio")
         st.write(
@@ -294,7 +449,7 @@ if st.session_state["admin_logged_in"]:
                             if not c.fetchone():
                                 c.execute(
                                     "INSERT INTO prenotazioni (nome, data, ora, trattamento,"
-                                    " data_creazione, device_id) VALUES (?, ?, ?, ?, ?, ?)",
+                                    " data_creazione, device_id, stato_presenza) VALUES (?, ?, ?, ?, ?, ?, ?)",
                                     (
                                         "🔒 STUDIO CHIUSO",
                                         d_str,
@@ -302,6 +457,7 @@ if st.session_state["admin_logged_in"]:
                                         "Chiusura Admin",
                                         datetime.now().strftime("%Y-%m-%d %H:%M"),
                                         "SYSTEM",
+                                        "Chiuso",
                                     ),
                                 )
                     else:
@@ -312,7 +468,7 @@ if st.session_state["admin_logged_in"]:
                         if not c.fetchone():
                             c.execute(
                                 "INSERT INTO prenotazioni (nome, data, ora, trattamento,"
-                                " data_creazione, device_id) VALUES (?, ?, ?, ?, ?, ?)",
+                                " data_creazione, device_id, stato_presenza) VALUES (?, ?, ?, ?, ?, ?, ?)",
                                 (
                                     "🔒 ORARIO CHIUSO",
                                     d_str,
@@ -320,6 +476,7 @@ if st.session_state["admin_logged_in"]:
                                     "Chiusura Admin",
                                     datetime.now().strftime("%Y-%m-%d %H:%M"),
                                     "SYSTEM",
+                                    "Chiuso",
                                 ),
                             )
                 st.success("Blocco applicato con successo per le date selezionate!")
@@ -340,7 +497,7 @@ if st.session_state["admin_logged_in"]:
             conn.close()
             st.rerun()
 
-    # 3. SEZIONE: ELIMINAZIONE SINGOLA, BAN MIRATO E BLACKLIST
+    # 5. SEZIONE: ELIMINAZIONE SINGOLA, BAN MIRATO E BLACKLIST
     with st.container(border=True):
         st.subheader("🛡️ Gestione Spam, Sicurezza e Blacklist")
 
@@ -369,8 +526,7 @@ if st.session_state["admin_logged_in"]:
             st.markdown("##### Banna Utente Individuale")
             conn_b = sqlite3.connect("prenotazioni.db")
             df_prenotazioni_attive = pd.read_sql_query(
-                "SELECT id, nome, trattamento, device_id FROM prenotazioni WHERE"
-                " device_id != 'SYSTEM'",
+                "SELECT id, nome, trattamento, device_id FROM prenotazioni WHERE device_id != 'SYSTEM'",
                 conn_b,
             )
             conn_b.close()
@@ -407,15 +563,13 @@ if st.session_state["admin_logged_in"]:
                         conn.commit()
                         st.success(
                             f"L'utente associato alla prenotazione #{id_selezionato}"
-                            f" (Dispositivo: {dev_id_da_bannare}) è stato bannato con"
-                            " successo!"
+                            f" (Dispositivo: {dev_id_da_bannare}) è stato bannato con successo!"
                         )
                     conn.close()
                     st.rerun()
             else:
                 st.info(
-                    "Nessuna prenotazione disponibile da cui ricavare l'utente da"
-                    " bannare."
+                    "Nessuna prenotazione disponibile da cui ricavare l'utente da bannare."
                 )
 
         st.markdown("##### 📋 Blacklist Dispositivi & Nominativi Associati")
@@ -447,7 +601,7 @@ if st.session_state["admin_logged_in"]:
                 )
                 conn.commit()
                 conn.close()
-                st.success(f"Dispositivo rimosso dalla blacklist con successo!")
+                st.success("Dispositivo rimosso dalla blacklist con successo!")
                 st.rerun()
         else:
             st.info("Nessun dispositivo presente nella blacklist.")
@@ -476,6 +630,62 @@ else:
             " violazione delle regole del servizio."
         )
     else:
+        # GESTIONE CHECK-IN TRAMITE QR CODE SCAN
+        if st.query_params.get("action") == "checkin":
+            if logo_path:
+                c1, c2, c3 = st.columns([1, 2, 1])
+                with c2:
+                    st.image(logo_path, use_container_width=True)
+
+            st.title("📍 Check-in Ingresso Studio")
+            oggi_str = datetime.today().strftime("%Y-%m-%d")
+
+            conn = sqlite3.connect("prenotazioni.db")
+            c = conn.cursor()
+            c.execute(
+                "SELECT id, nome, trattamento, ora, stato_presenza FROM prenotazioni WHERE device_id = ? AND data = ?",
+                (client_device_id, oggi_str),
+            )
+            prenotazione_oggi = c.fetchone()
+            conn.close()
+
+            if prenotazione_oggi:
+                p_id, p_nome, p_tratt, p_ora, p_stato = prenotazione_oggi
+                with st.container(border=True):
+                    st.markdown(f"### Ciao {p_nome}! 🧘‍♀️")
+                    st.write(
+                        f"Abbiamo trovato la tua prenotazione odierna per **{p_tratt}** alle ore **{p_ora}**."
+                    )
+
+                    if p_stato == "Presente":
+                        st.success(
+                            f"✅ Il tuo check-in è già stato registrato per oggi!\n\n**Codice Seduta:** `SEDUTA-OK-{p_id}-{oggi_str}`"
+                        )
+                    else:
+                        if st.button("📍 Conferma Arrivo in Studio"):
+                            conn = sqlite3.connect("prenotazioni.db")
+                            c = conn.cursor()
+                            c.execute(
+                                "UPDATE prenotazioni SET stato_presenza = 'Presente' WHERE id = ?",
+                                (p_id,),
+                            )
+                            conn.commit()
+                            conn.close()
+                            st.success(
+                                f"🎉 Check-in effettuato con successo!\n\nIl tuo codice seduta validato è:\n### `SEDUTA-OK-{p_id}-{oggi_str}`"
+                            )
+                            st.balloons()
+            else:
+                st.warning(
+                    "⚠️ Nessuna prenotazione attiva trovata per oggi a nome di questo dispositivo. Se hai prenotato con un altro dispositivo o hai problemi, contatta la Dott.ssa Roberta Sinagra."
+                )
+
+            if st.button("🏠 Torna alla Home principale"):
+                st.query_params.clear()
+                st.rerun()
+
+            st.stop()
+
         if logo_path:
             c1, c2, c3 = st.columns([1, 2, 1])
             with c2:
@@ -606,15 +816,13 @@ else:
 
                 if is_banned_now:
                     st.error(
-                        "⛔ Spiacenti, questo dispositivo è stato bloccato. Impossibile"
-                        " completare la prenotazione."
+                        "⛔ Spiacenti, questo dispositivo è stato bloccato. Impossibile completare la prenotazione."
                     )
                 elif not nome.strip():
                     st.error("Per favore inserisci il tuo nome e cognome.")
                 elif not ora_scelta or "Tutto occupato" in ora_scelta:
                     st.error(
-                        "Spiacenti, non ci sono orari disponibili o lo studio è"
-                        " chiuso per la data selezionata."
+                        "Spiacenti, non ci sono orari disponibili o lo studio è chiuso per la data selezionata."
                     )
                 else:
                     conn = sqlite3.connect("prenotazioni.db")
@@ -649,15 +857,12 @@ else:
 
                     if impossibile_prenotare:
                         st.error(
-                            "⚠️ Spiacenti, questo orario non ha più disponibilità per il"
-                            " trattamento scelto (potrebbe essere stato appena occupato)!"
-                            " Riprova con un altro orario."
+                            "⚠️ Spiacenti, questo orario non ha più disponibilità per il trattamento scelto (potrebbe essere stato appena occupato)! Riprova con un altro orario."
                         )
                         conn.close()
                     else:
                         c.execute(
-                            "INSERT INTO prenotazioni (nome, data, ora, trattamento,"
-                            " data_creazione, device_id) VALUES (?, ?, ?, ?, ?, ?)",
+                            "INSERT INTO prenotazioni (nome, data, ora, trattamento, data_creazione, device_id, stato_presenza) VALUES (?, ?, ?, ?, ?, ?, ?)",
                             (
                                 nome,
                                 str(data_scelta),
@@ -665,6 +870,7 @@ else:
                                 trattamento,
                                 datetime.now().strftime("%Y-%m-%d %H:%M"),
                                 client_device_id,
+                                "Assente",
                             ),
                         )
                         conn.commit()
@@ -672,8 +878,7 @@ else:
 
                         data_formattata = data_scelta.strftime("%d/%m/%Y")
                         st.session_state["booking_success_msg"] = (
-                            f"🎉 PRENOTAZIONE CONFERMATA!\n\nGrazie {nome}, ti aspettiamo il"
-                            f" {data_formattata} alle ore {ora_scelta} per {trattamento}."
+                            f"🎉 PRENOTAZIONE CONFERMATA!\n\nGrazie {nome}, ti aspettiamo il {data_formattata} alle ore {ora_scelta} per {trattamento}."
                         )
                         st.session_state["reset_nome_flag"] = True
                         st.rerun()
@@ -706,7 +911,7 @@ else:
         # TAB 3: DOVE SIAMO
         with tab3:
             st.markdown("### 📍 Dove Siamo & Contatti")
-            st.write("📍 **Indirizzo:** Via Antonino di San Giuliano 55, Sant’Agata li Battiati ")
+            st.write("📍 **Indirizzo:** Inserisci qui l'indirizzo dello studio")
             st.markdown(
                 "📞 **Telefono / WhatsApp:** [+39 379"
                 " 2073118](tel:+393792073118) o [Scrivici su"
