@@ -136,7 +136,7 @@ def get_orari_per_data(data):
         ]
 
 
-# Identificazione univoca persistente tramite LocalStorage (Preserva tutti i parametri della URL come action=checkin)
+# Identificazione univoca persistente tramite LocalStorage (Legge e preserva i parametri della finestra principale con window.parent)
 def get_client_device_id():
     if "dev_id" not in st.query_params or not st.query_params["dev_id"].strip():
         components.html(
@@ -151,10 +151,11 @@ def get_client_device_id():
             localStorage.setItem('pilates_dev_id', devId);
         }
         
-        const urlParams = new URLSearchParams(window.location.search);
+        // Legge i parametri dalla finestra principale del browser (parent)
+        const urlParams = new URLSearchParams(window.parent.location.search);
         if (!urlParams.has('dev_id') || urlParams.get('dev_id') !== devId) {
             urlParams.set('dev_id', devId);
-            window.location.href = window.location.pathname + '?' + urlParams.toString();
+            window.parent.location.href = window.parent.location.pathname + '?' + urlParams.toString();
         }
         </script>
         """,
@@ -658,7 +659,7 @@ else:
             if prenotazione_oggi:
                 p_id, p_nome, p_tratt, p_ora, p_stato = prenotazione_oggi
 
-                # Se non era ancora registrato come presente, aggiorniamo automaticamente in automatico
+                # Aggiornamento automatico della presenza nel database
                 if p_stato != "Presente":
                     conn = sqlite3.connect("prenotazioni.db")
                     c = conn.cursor()
