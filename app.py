@@ -137,7 +137,7 @@ def get_orari_per_data(data):
         ]
 
 
-# Identificazione univoca nativa tramite Streamlit (Senza blocchi iframe)
+# Identificazione univoca nativa tramite Streamlit
 def get_client_device_id():
     if "device_id_internale" not in st.session_state:
         if "dev_id" in st.query_params and st.query_params["dev_id"].strip():
@@ -622,7 +622,7 @@ else:
             " violazione delle regole del servizio."
         )
     else:
-        # GESTIONE CHECK-IN AUTOMATICO TRAMITE QR CODE SCAN
+        # GESTIONE CHECK-IN AUTOMATICO TRAMITE QR CODE SCAN (SELEZIONE NOME/ORARIO)
         if st.query_params.get("action") == "checkin":
             if logo_path:
                 c1, c2, c3 = st.columns([1, 2, 1])
@@ -635,30 +635,20 @@ else:
             conn = sqlite3.connect("prenotazioni.db")
             c = conn.cursor()
             c.execute(
-                "SELECT id, nome, trattamento, ora, stato_presenza FROM prenotazioni WHERE device_id = ? AND data = ?",
-                (client_device_id, oggi_str),
+                "SELECT id, nome, trattamento, ora, stato_presenza FROM prenotazioni WHERE data = ? AND device_id != 'SYSTEM' ORDER BY ora ASC",
+                (oggi_str,),
             )
-            prenotazione_oggi = c.fetchone()
+            appuntamenti_oggi = c.fetchall()
             conn.close()
 
-            if prenotazione_oggi:
-                p_id, p_nome, p_tratt, p_ora, p_stato = prenotazione_oggi
-
-                # Aggiornamento automatico della presenza nel database
-                if p_stato != "Presente":
-                    conn = sqlite3.connect("prenotazioni.db")
-                    c = conn.cursor()
-                    c.execute(
-                        "UPDATE prenotazioni SET stato_presenza = 'Presente' WHERE id = ?",
-                        (p_id,),
-                    )
-                    conn.commit()
-                    conn.close()
-                    st.balloons()
-
+            if "checkin_successo" in st.session_state:
+                p_id, p_nome, p_tratt, p_ora, oggi_str = st.session_state[
+                    "checkin_successo"
+                ]
+                st.balloons()
                 with st.container(border=True):
                     st.markdown(f"### Ciao {p_nome}! 🧘‍♀️")
-                    st.success("🎉 **Presenza effettuata con successo!**")
+                    st.success("🎉 **Presenza registrata con successo!**")
                     st.write(
                         f"Abbiamo registrato il tuo arrivo per la lezione di **{p_tratt}** delle ore **{p_ora}**."
                     )
@@ -668,13 +658,57 @@ else:
                         f"<h3 style='color: #D81B60; text-align: center;'>`SEDUTA-OK-{p_id}-{oggi_str}`</h3>",
                         unsafe_allow_html=True,
                     )
+            elif appuntamenti_oggi:
+                with st.container(border=True):
+                    st.markdown(
+                        "**Benvenuto/a in studio! 🧘‍♀️ Seleziona il tuo appuntamento per confermare l'arrivo:**"
+                    )
+                    with st.form("form_checkin_cliente"):
+                        scelte = [
+                            f"{ora} - {nome} ({trattamento})"
+                            for p_id, nome, trattamento, ora, stato in appuntamenti_oggi
+                        ]
+                        scelta_utente = st.selectbox(
+                            "Il tuo appuntamento",
+                            scelte,
+                            key="scelta_checkin_cliente",
+                        )
+                        submit_checkin = st.form_submit_button(
+                            "✅ Conferma la mia Presenza"
+                        )
+
+                        if submit_checkin:
+                            idx = scelte.index(scelta_utente)
+                            p_id, p_nome, p_tratt, p_ora, p_stato = (
+                                appuntamenti_oggi[idx]
+                            )
+
+                            conn = sqlite3.connect("prenotazioni.db")
+                            c = conn.cursor()
+                            c.execute(
+                                "UPDATE prenotazioni SET stato_presenza = 'Presente' WHERE id = ?",
+                                (p_id,),
+                            )
+                            conn.commit()
+                            conn.close()
+
+                            st.session_state["checkin_successo"] = (
+                                p_id,
+                                p_nome,
+                                p_tratt,
+                                p_ora,
+                                oggi_str,
+                            )
+                            st.rerun()
             else:
                 st.warning(
-                    "⚠️ Nessuna prenotazione attiva trovata per oggi a nome di questo dispositivo. Se hai prenotato con un altro dispositivo o hai problemi, contatta la Dott.ssa Roberta Sinagra."
+                    "⚠️ Nessuna prenotazione registrata nel sistema per la giornata odierna."
                 )
 
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("🏠 Torna alla Home principale"):
+                if "checkin_successo" in st.session_state:
+                    del st.session_state["checkin_successo"]
                 st.query_params.clear()
                 st.rerun()
 
