@@ -273,9 +273,15 @@ if st.session_state["admin_logged_in"]:
 
                     with col_p1:
                         is_presente = st.checkbox(
-                            f"**{ora_cli}** - {nome_cli} <br><span style='color: #666; font-size: 0.9em;'>{tratt_cli}</span>",
+                            f"{ora_cli} - {nome_cli}",
                             value=is_checked_default,
                             key=f"pres_{app_id}",
+                        )
+                        st.markdown(
+                            f"<div style='color: #666; font-size: 0.85em;"
+                            f" margin-top: -8px; margin-left:"
+                            f" 24px;'>{tratt_cli}</div>",
+                            unsafe_allow_html=True,
                         )
                         presenze_dict[app_id] = (
                             "Presente" if is_presente else "Assente"
