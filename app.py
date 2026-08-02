@@ -670,7 +670,7 @@ else:
                     st.markdown(f"### Ciao {p_nome}! 🧘‍♀️")
                     st.success("🎉 **Presenza registrata con successo!**")
                     st.write(
-                        f"Abbiamo registrato il tuo arrivo per la lezione di **{p_tratt}** delle ore **{p_ora}**."
+                        f"Ho registrato il tuo arrivo per la lezione di **{p_tratt}** delle ore **{p_ora}**."
                     )
                     st.markdown("---")
                     st.markdown(f"**Il tuo Codice Seduta:**")
@@ -1024,7 +1024,7 @@ else:
 
                         data_formattata = data_scelta.strftime("%d/%m/%Y")
                         st.session_state["booking_success_msg"] = (
-                            f"🎉 PRENOTAZIONE CONFERMATA!\n\nGrazie {nome.strip()} {cognome.strip()}, ti aspettiamo il {data_formattata} alle ore {ora_scelta} per {trattamento}."
+                            f"🎉 PRENOTAZIONE CONFERMATA!\n\nGrazie {nome.strip()} {cognome.strip()}, ti aspetto il {data_formattata} alle ore {ora_scelta} per {trattamento}."
                         )
                         st.session_state["reset_form_flag"] = True
                         st.rerun()
@@ -1033,7 +1033,7 @@ else:
         with tab2:
             st.markdown("### ℹ️ Informazioni sullo Studio")
             st.write(
-                "Benvenuti nello studio della **Dott.ssa Roberta Sinagra**,"
+                "Benvenuto/a nello studio della **Dott.ssa Roberta Sinagra**,"
                 " specializzato in Posturologia e Pilates."
             )
 
