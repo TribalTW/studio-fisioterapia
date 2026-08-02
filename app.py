@@ -182,6 +182,14 @@ def get_client_device_id():
     return st.session_state["device_id_internale"]
 
 
+def get_current_time_local():
+    try:
+        local_tz = ZoneInfo("Europe/Rome")
+        return datetime.now(local_tz)
+    except Exception:
+        return datetime.now()
+
+
 logo_path = None
 for possible_name in [
     "logo.png", "logo.PNG", "logo.jpg", "logo.jpeg", "logo.png.png",
@@ -232,7 +240,7 @@ if st.session_state["admin_logged_in"]:
         st.subheader("📋 Elenco Prenotazioni & Codici Fiscali")
         conn = sqlite3.connect("prenotazioni.db")
         df = pd.read_sql_query(
-            "SELECT id, nome, codice_fiscale, data, ora, trattamento, stato_presenza, data_creazione, device_id FROM prenotazioni ORDER BY data DESC, ora ASC",
+            "SELECT id, nome, codice_fiscale, codice_fiscale_2, data, ora, trattamento, stato_presenza, data_creazione, device_id FROM prenotazioni ORDER BY data DESC, ora ASC",
             conn,
         )
         conn.close()
@@ -431,6 +439,7 @@ if st.session_state["admin_logged_in"]:
 
             conn = sqlite3.connect("prenotazioni.db")
             c = conn.cursor()
+            ora_attuale_str = get_current_time_local().strftime("%Y-%m-%d %H:%M")
 
             if btn_blocca:
                 for d_str in lista_date:
@@ -447,8 +456,7 @@ if st.session_state["admin_logged_in"]:
                                     (
                                         "🔒 STUDIO CHIUSO", d_str, h,
                                         "Chiusura Admin",
-                                        datetime.now().strftime("%Y-%m-%d %H:%M"),
-                                        "SYSTEM", "Chiuso",
+                                        ora_attuale_str, "SYSTEM", "Chiuso",
                                     ),
                                 )
                     else:
@@ -462,8 +470,7 @@ if st.session_state["admin_logged_in"]:
                                 (
                                     "🔒 ORARIO CHIUSO", d_str, ora_intervallo,
                                     "Chiusura Admin",
-                                    datetime.now().strftime("%Y-%m-%d %H:%M"),
-                                    "SYSTEM", "Chiuso",
+                                    ora_attuale_str, "SYSTEM", "Chiuso",
                                 ),
                             )
                 st.success("Blocco applicato con successo!")
@@ -611,12 +618,7 @@ else:
 
             st.title("📍 Check-in Ingresso Studio")
             
-            try:
-                local_tz = ZoneInfo("Europe/Rome")
-                current_dt = datetime.now(local_tz)
-            except Exception:
-                current_dt = datetime.now()
-
+            current_dt = get_current_time_local()
             oggi_str = current_dt.strftime("%Y-%m-%d")
             current_time = current_dt.time()
 
@@ -811,29 +813,28 @@ else:
                 conn = sqlite3.connect("prenotazioni.db")
                 c = conn.cursor()
                 c.execute(
-                    "SELECT ora, trattamento FROM prenotazioni WHERE data = ?",
+                    "SELECT ora, trattamento, codice_fiscale, codice_fiscale_2, device_id FROM prenotazioni WHERE data = ?",
                     (str(data_scelta),),
                 )
                 prenotazioni_giorno = c.fetchall()
                 conn.close()
 
                 TUTTI_GLI_ORARI = get_orari_per_data(data_scelta)
-
-                try:
-                    local_tz = ZoneInfo("Europe/Rome")
-                    current_datetime = datetime.now(local_tz)
-                except Exception:
-                    current_datetime = datetime.now()
-
+                current_datetime = get_current_time_local()
                 current_date = current_datetime.date()
                 current_time = current_datetime.time()
+
+                # Ricaviamo i codici fiscali inseriti temporaneamente (se l'utente li sta compilando)
+                cf_curr = codice_fiscale.strip().upper() if codice_fiscale else ""
+                cf_curr_2 = codice_fiscale_2.strip().upper() if codice_fiscale_2 else ""
 
                 orari_disponibili = []
                 for h in TUTTI_GLI_ORARI:
                     posti_occupati = 0
                     slot_bloccato = False
+                    utente_gia_prenotato = False
 
-                    for p_ora, p_trattamento in prenotazioni_giorno:
+                    for p_ora, p_trattamento, p_cf1, p_cf2, p_dev in prenotazioni_giorno:
                         if p_ora == h:
                             if (
                                 p_trattamento in ("Chiusura Admin", "🔒 STUDIO CHIUSO")
@@ -841,12 +842,21 @@ else:
                             ):
                                 slot_bloccato = True
                                 break
-                            elif p_trattamento == "Pilates Duetto (in coppia)":
+                            
+                            # Controlliamo se questo utente (per device o per codice fiscale) ha già prenotato questo slot
+                            if p_dev == client_device_id:
+                                utente_gia_prenotato = True
+                            if cf_curr and (p_cf1 == cf_curr or p_cf2 == cf_curr or p_cf1 == cf_curr_2 or p_cf2 == cf_curr_2):
+                                utente_gia_prenotato = True
+                            if cf_curr_2 and (p_cf1 == cf_curr_2 or p_cf2 == cf_curr_2):
+                                utente_gia_prenotato = True
+
+                            if p_trattamento == "Pilates Duetto (in coppia)":
                                 posti_occupati += 2
                             else:
                                 posti_occupati += 1
 
-                    if slot_bloccato:
+                    if slot_bloccato or utente_gia_prenotato:
                         continue
 
                     if trattamento == "Pilates Duetto (in coppia)":
@@ -871,7 +881,7 @@ else:
                     else:
                         st.selectbox(
                             "Seleziona Ora *",
-                            ["Tutto occupato / Chiuso"],
+                            ["Tutto occupato / Chiuso / Già prenotato"],
                             disabled=True,
                             key="dis_ora_occupato",
                         )
@@ -897,6 +907,26 @@ else:
                 if trattamento == "Pilates Duetto (in coppia)":
                     cf_2_valido, cf_2_msg = valida_codice_fiscale(nome_2, cognome_2, codice_fiscale_2)
 
+                cf_principale = codice_fiscale.strip().upper()
+                cf_secondario = codice_fiscale_2.strip().upper() if trattamento == "Pilates Duetto (in coppia)" else None
+
+                # Controllo aggiuntivo se l'utente ha già una prenotazione in questo orario nel DB
+                conn_dupl = sqlite3.connect("prenotazioni.db")
+                c_dupl = conn_dupl.cursor()
+                c_dupl.execute(
+                    """SELECT id FROM prenotazioni 
+                       WHERE data = ? AND ora = ? 
+                         AND (device_id = ? OR UPPER(codice_fiscale) = ? OR UPPER(codice_fiscale_2) = ? 
+                              OR (? IS NOT NULL AND (UPPER(codice_fiscale) = ? OR UPPER(codice_fiscale_2) = ?)))""",
+                    (
+                        str(data_scelta), ora_scelta, 
+                        client_device_id, cf_principale, cf_principale,
+                        cf_secondario, cf_secondario, cf_secondario
+                    )
+                )
+                gia_presente = c_dupl.fetchone()
+                conn_dupl.close()
+
                 if is_banned_now:
                     st.error("⛔ Spiacenti, questo dispositivo è stato bloccato.")
                 elif not nome.strip() or not cognome.strip() or not codice_fiscale.strip():
@@ -907,17 +937,15 @@ else:
                     st.error("Per favore inserisci tutti i dati anche per la seconda persona.")
                 elif trattamento == "Pilates Duetto (in coppia)" and not cf_2_valido:
                     st.error(f"❌ **Codice Fiscale non valido per la seconda persona ({nome_2} {cognome_2}):** {cf_2_msg}")
-                elif not ora_scelta or "Tutto occupato" in ora_scelta:
+                elif gia_presente:
+                    st.error("⚠️ Hai già una prenotazione attiva in questo giorno e orario (oppure uno dei partecipanti risulta già registrato nello stesso slot).")
+                elif not ora_scelta or "Tutto occupato" in ora_scelta or "Già prenotato" in ora_scelta:
                     st.error("Spiacenti, non ci sono orari disponibili per la data selezionata.")
                 else:
                     if trattamento == "Pilates Duetto (in coppia)":
                         nome_completo = f"{nome.strip()} {cognome.strip()} & {nome_2.strip()} {cognome_2.strip()}"
-                        cf_principale = codice_fiscale.strip().upper()
-                        cf_secondario = codice_fiscale_2.strip().upper()
                     else:
                         nome_completo = f"{nome.strip()} {cognome.strip()}"
-                        cf_principale = codice_fiscale.strip().upper()
-                        cf_secondario = None
 
                     conn = sqlite3.connect("prenotazioni.db")
                     c = conn.cursor()
@@ -953,6 +981,7 @@ else:
                         st.error("⚠️ Spiacenti, questo orario è stato appena occupato! Riprova con un altro orario.")
                         conn.close()
                     else:
+                        data_creazione_str = get_current_time_local().strftime("%Y-%m-%d %H:%M")
                         c.execute(
                             "INSERT INTO prenotazioni (nome, data, ora, trattamento, data_creazione, device_id, stato_presenza, codice_fiscale, codice_fiscale_2) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                             (
@@ -960,7 +989,7 @@ else:
                                 str(data_scelta),
                                 ora_scelta,
                                 trattamento,
-                                datetime.now().strftime("%Y-%m-%d %H:%M"),
+                                data_creazione_str,
                                 client_device_id,
                                 "Assente",
                                 cf_principale,
@@ -995,7 +1024,7 @@ else:
                 """)
 
             st.markdown("---")
-            st.markdown("#### 📱 Installa la Web App sul tuo Smartphone")
+            st.markdown("#### 📱 Installa la Web App sullo Smartphone")
             st.markdown("""
                 Puoi aggiungere questa applicazione alla schermata principale del tuo telefono per accedere velocemente alle prenotazioni:
                 * **🍎 iPhone / iPad (Safari):** Tocca l'icona di condivisione nel menu in basso e seleziona **"Aggiungi alla schermata Home"**.
