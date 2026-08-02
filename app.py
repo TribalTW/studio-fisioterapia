@@ -1,5 +1,6 @@
 from datetime import datetime, time, timedelta
 import os
+import re
 import sqlite3
 import uuid
 from zoneinfo import ZoneInfo
@@ -51,7 +52,6 @@ st.markdown(
         background-color: #C2185B !important;
     }
     
-    /* Stile specifico personalizzato per rendere il pulsante di aggiornamento più sottile, orizzontale e a sinistra */
     div[data-testid="stColumn"] div.stButton > button.btn-aggiorna {
         padding: 6px 15px !important;
         font-size: 0.9rem !important;
@@ -76,7 +76,41 @@ st.markdown(
 )
 
 
-# Inizializzazione Database SQLite con supporto Codice Fiscale, Device ID, Blacklist e Presenze
+# Funzioni di supporto per la verifica del Codice Fiscale
+def estrai_consonanti_vocali(testo):
+    testo = testo.upper()
+    consonanti = "".join([c for c in testo if c.isalpha() and c not in "AEIOU"])
+    vocali = "".join([c for c in testo if c.isalpha() and c in "AEIOU"])
+    return consonanti, vocali
+
+
+def calcola_iniziali_cf(cognome, nome):
+    c_cons, c_voc = estrai_consonanti_vocali(cognome)
+    cognome_cf = (c_cons + c_voc + "XXX")[:3]
+    
+    n_cons, n_voc = estrai_consonanti_vocali(nome)
+    if len(n_cons) >= 4:
+        nome_cf = n_cons[0] + n_cons[2] + n_cons[3]
+    else:
+        nome_cf = (n_cons + n_voc + "XXX")[:3]
+        
+    return cognome_cf, nome_cf
+
+
+def valida_codice_fiscale(nome, cognome, cf):
+    cf = cf.strip().upper()
+    regex_cf = r"^[A-Z]{6}[0-9]{2}[A-E&H-L-N-P-R-V][0-9]{2}[A-Z][0-9]{3}[A-Z]$"
+    if not re.match(regex_cf, cf):
+        return False, "Il formato del Codice Fiscale non è valido (deve essere di 16 caratteri alfanumerici corretti)."
+    
+    cog_esperato, _ = calcola_iniziali_cf(cognome, nome)
+    if cf[:3] != cog_esperato:
+        return False, f"Le prime 3 lettere del Codice Fiscale non corrispondono al cognome inserito ({cognome})."
+    
+    return True, ""
+
+
+# Inizializzazione Database SQLite
 def init_db():
     conn = sqlite3.connect("prenotazioni.db")
     c = conn.cursor()
@@ -118,35 +152,23 @@ def init_db():
 init_db()
 
 
-# Funzione per determinare gli orari in base al giorno della settimana
 def get_orari_per_data(data):
     if isinstance(data, str):
         d = datetime.strptime(data, "%Y-%m-%d").date()
     else:
         d = data
-    weekday = d.weekday()  # 0=Lun, ..., 5=Sab, 6=Dom
-    if weekday == 5:  # Sabato (08:00 - 13:00)
+    weekday = d.weekday()
+    if weekday == 5:
         return ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00"]
-    elif weekday == 6:  # Domenica (Chiuso)
+    elif weekday == 6:
         return []
-    else:  # Lunedì - Venerdì (08:00 - 19:00 no stop)
+    else:
         return [
-            "08:00",
-            "09:00",
-            "10:00",
-            "11:00",
-            "12:00",
-            "13:00",
-            "14:00",
-            "15:00",
-            "16:00",
-            "17:00",
-            "18:00",
-            "19:00",
+            "08:00", "09:00", "10:00", "11:00", "12:00", "13:00",
+            "14:00", "15:00", "16:00", "17:00", "18:00", "19:00",
         ]
 
 
-# Identificazione univoca nativa tramite Streamlit
 def get_client_device_id():
     if "device_id_internale" not in st.session_state:
         if "dev_id" in st.query_params and st.query_params["dev_id"].strip():
@@ -160,14 +182,9 @@ def get_client_device_id():
     return st.session_state["device_id_internale"]
 
 
-# Cerca se esiste il file del logo
 logo_path = None
 for possible_name in [
-    "logo.png",
-    "logo.PNG",
-    "logo.jpg",
-    "logo.jpeg",
-    "logo.png.png",
+    "logo.png", "logo.PNG", "logo.jpg", "logo.jpeg", "logo.png.png",
 ]:
     if os.path.exists(possible_name):
         logo_path = possible_name
@@ -182,7 +199,6 @@ st.sidebar.title("🔐 Area Riservata (Admin)")
 
 ADMIN_PASSWORD = "MiaPassword2026!"
 
-# Gestione dello stato di Login Admin
 if "admin_logged_in" not in st.session_state:
     st.session_state["admin_logged_in"] = False
 
@@ -196,7 +212,6 @@ if not st.session_state["admin_logged_in"]:
     elif admin_pass != "":
         st.sidebar.error("Password errata!")
 
-# Pulsante di Logout se l'admin è collegato
 if st.session_state["admin_logged_in"]:
     st.sidebar.success("Accesso Admin attivo")
     if st.sidebar.button("🚪 Esci dall'Area Admin"):
@@ -208,13 +223,11 @@ if st.session_state["admin_logged_in"]:
 if st.session_state["admin_logged_in"]:
     st.title("📊 Gestione Appuntamenti & Studio (Admin)")
 
-    # Pulsante rapido a sinistra, sottile e allungato, perfettamente allineato
     if st.button("🔄 Aggiorna Dati", key="btn_aggiorna_dati"):
         st.rerun()
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # 1. TABELLA APPUNTAMENTI
     with st.container(border=True):
         st.subheader("📋 Elenco Prenotazioni & Codici Fiscali")
         conn = sqlite3.connect("prenotazioni.db")
@@ -229,12 +242,11 @@ if st.session_state["admin_logged_in"]:
         else:
             st.info("Nessuna prenotazione presente nel database.")
 
-    # 2. SEZIONE GESTIONE PRESENZE RAPIDA (CON CHECKBOX) & CODICE GESTIONALE
     with st.container(border=True):
         st.subheader("✅ Spunta Presenze Veloci & Codici Seduta")
         st.write(
             "Seleziona la data: i clienti partono di default come assenti. "
-            "**Metti la spunta solo a chi si è presentato** (oppure ci penserà il QR code in studio) e clicca salva per generare i codici seduta."
+            "**Metti la spunta solo a chi si è presentato** e clicca salva per generare i codici seduta."
         )
 
         data_presenze = st.date_input(
@@ -256,19 +268,11 @@ if st.session_state["admin_logged_in"]:
                 st.markdown(
                     f"**Appuntamenti del {data_presenze.strftime('%d/%m/%Y')}:**"
                 )
-                st.markdown(
-                    "<small style='color: gray;'>Metti la spunta per confermare la presenza. Chi non ha la spunta resterà registrato come assente.</small>",
-                    unsafe_allow_html=True,
-                )
                 st.markdown("---")
 
                 presenze_dict = {}
                 for (
-                    app_id,
-                    nome_cli,
-                    tratt_cli,
-                    ora_cli,
-                    stato_attuale,
+                    app_id, nome_cli, tratt_cli, ora_cli, stato_attuale,
                 ) in appuntamenti_giorno:
                     col_p1, col_p2 = st.columns([3, 2])
                     is_checked_default = stato_attuale == "Presente"
@@ -280,9 +284,7 @@ if st.session_state["admin_logged_in"]:
                             key=f"pres_{app_id}",
                         )
                         st.markdown(
-                            f"<div style='color: #666; font-size: 0.85em;"
-                            f" margin-top: -8px; margin-left:"
-                            f" 24px;'>{tratt_cli}</div>",
+                            f"<div style='color: #666; font-size: 0.85em; margin-top: -8px; margin-left: 24px;'>{tratt_cli}</div>",
                             unsafe_allow_html=True,
                         )
                         presenze_dict[app_id] = (
@@ -320,11 +322,8 @@ if st.session_state["admin_logged_in"]:
                     st.success("Presenze salvate con successo!")
                     st.rerun()
         else:
-            st.info(
-                "Nessun appuntamento cliente registrato per la data selezionata."
-            )
+            st.info("Nessun appuntamento cliente registrato per la data selezionata.")
 
-        # SEZIONE STATISTICHE / TOTALE SEDUTE FATTE (GESTIONALE)
         st.markdown("---")
         st.markdown("#### 📈 Riepilogo e Calcolo Totale Sedute (Gestionale)")
         if st.button("📊 Calcola Statistiche e Sedute Svolte per Cliente"):
@@ -345,18 +344,15 @@ if st.session_state["admin_logged_in"]:
             conn.close()
             if not df_stat.empty:
                 st.dataframe(df_stat, use_container_width=True)
-                st.success(
-                    "💡 Questo report calcola automaticamente le sedute effettuate ed è pronto per essere esportato o collegato al futuro software gestionale!"
-                )
+                st.success("💡 Report calcolato con successo!")
             else:
                 st.info("Nastro dati insufficiente per le statistiche.")
 
-    # 3. SEZIONE QR CODE CHECK-IN STUDIO
     with st.container(border=True):
         st.subheader("📷 QR Code Check-in Ingresso Studio")
         st.write(
             "Mostra o stampa questo QR code da posizionare all'ingresso dello studio. "
-            "Quando un cliente arriva e inquadra il QR code con il telefono, inserirà il proprio Codice Fiscale per registrare la presenza!"
+            "Quando arrivo il cliente potrà inquadrarlo per registrare la presenza."
         )
 
         components.html(
@@ -385,13 +381,9 @@ if st.session_state["admin_logged_in"]:
             width=None,
         )
 
-    # 4. SEZIONE CHIUSURE E SBLOCCHI STUDIO
     with st.container(border=True):
         st.subheader("🔒🔓 Gestione Chiusure e Sblocchi Studio")
-        st.write(
-            "Seleziona un giorno o un intervallo, scegli l'orario (o l'intera"
-            " giornata) e clicca sul pulsante corrispondente."
-        )
+        st.write("Seleziona un giorno o un intervallo e gestisci la disponibilità.")
 
         col_bs1, col_bs2 = st.columns(2)
         with col_bs1:
@@ -410,18 +402,8 @@ if st.session_state["admin_logged_in"]:
 
         ora_intervallo = None
         TUTTI_GLI_ORARI_ADMIN = [
-            "08:00",
-            "09:00",
-            "10:00",
-            "11:00",
-            "12:00",
-            "13:00",
-            "14:00",
-            "15:00",
-            "16:00",
-            "17:00",
-            "18:00",
-            "19:00",
+            "08:00", "09:00", "10:00", "11:00", "12:00", "13:00",
+            "14:00", "15:00", "16:00", "17:00", "18:00", "19:00",
         ]
         if modo_intervallo == "Orario specifico":
             ora_intervallo = st.selectbox(
@@ -461,16 +443,12 @@ if st.session_state["admin_logged_in"]:
                             )
                             if not c.fetchone():
                                 c.execute(
-                                    "INSERT INTO prenotazioni (nome, data, ora, trattamento,"
-                                    " data_creazione, device_id, stato_presenza) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                                    "INSERT INTO prenotazioni (nome, data, ora, trattamento, data_creazione, device_id, stato_presenza) VALUES (?, ?, ?, ?, ?, ?, ?)",
                                     (
-                                        "🔒 STUDIO CHIUSO",
-                                        d_str,
-                                        h,
+                                        "🔒 STUDIO CHIUSO", d_str, h,
                                         "Chiusura Admin",
                                         datetime.now().strftime("%Y-%m-%d %H:%M"),
-                                        "SYSTEM",
-                                        "Chiuso",
+                                        "SYSTEM", "Chiuso",
                                     ),
                                 )
                     else:
@@ -480,19 +458,15 @@ if st.session_state["admin_logged_in"]:
                         )
                         if not c.fetchone():
                             c.execute(
-                                "INSERT INTO prenotazioni (nome, data, ora, trattamento,"
-                                " data_creazione, device_id, stato_presenza) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                                "INSERT INTO prenotazioni (nome, data, ora, trattamento, data_creazione, device_id, stato_presenza) VALUES (?, ?, ?, ?, ?, ?, ?)",
                                 (
-                                    "🔒 ORARIO CHIUSO",
-                                    d_str,
-                                    ora_intervallo,
+                                    "🔒 ORARIO CHIUSO", d_str, ora_intervallo,
                                     "Chiusura Admin",
                                     datetime.now().strftime("%Y-%m-%d %H:%M"),
-                                    "SYSTEM",
-                                    "Chiuso",
+                                    "SYSTEM", "Chiuso",
                                 ),
                             )
-                st.success("Blocco applicato con successo per le date selezionate!")
+                st.success("Blocco applicato con successo!")
 
             elif btn_sblocca:
                 for d_str in lista_date:
@@ -504,13 +478,12 @@ if st.session_state["admin_logged_in"]:
                                 "DELETE FROM prenotazioni WHERE data = ? AND ora = ?",
                                 (d_str, ora_intervallo),
                             )
-                st.success("Sblocco applicato con successo per le date selezionate!")
+                st.success("Sblocco applicato con successo!")
 
             conn.commit()
             conn.close()
             st.rerun()
 
-    # 5. SEZIONE: ELIMINAZIONE SINGOLA, BAN MIRATO E BLACKLIST
     with st.container(border=True):
         st.subheader("🛡️ Gestione Spam, Sicurezza e Blacklist")
 
@@ -519,9 +492,7 @@ if st.session_state["admin_logged_in"]:
             st.markdown("##### Elimina Prenotazione Singola")
             id_da_eliminare = st.number_input(
                 "ID Prenotazione da eliminare",
-                min_value=0,
-                step=1,
-                key="id_elimina_input",
+                min_value=0, step=1, key="id_elimina_input",
             )
             if st.button("Elimina Singola Prenotazione"):
                 if id_da_eliminare > 0:
@@ -530,9 +501,7 @@ if st.session_state["admin_logged_in"]:
                     c.execute("DELETE FROM prenotazioni WHERE id = ?", (id_da_eliminare,))
                     conn.commit()
                     conn.close()
-                    st.success(
-                        f"Prenotazione con ID {id_da_eliminare} eliminata con successo!"
-                    )
+                    st.success(f"Prenotazione #{id_da_eliminare} eliminata!")
                     st.rerun()
 
         with col_sec2:
@@ -554,7 +523,7 @@ if st.session_state["admin_logged_in"]:
                     + ")"
                 )
                 scelta_ban = st.selectbox(
-                    "Seleziona utente/prenotazione da bannare",
+                    "Seleziona utente da bannare",
                     df_prenotazioni_attive["label"].tolist(),
                     key="seleziona_ban_input",
                 )
@@ -574,23 +543,18 @@ if st.session_state["admin_logged_in"]:
                             (dev_id_da_bannare,),
                         )
                         conn.commit()
-                        st.success(
-                            f"L'utente associato alla prenotazione #{id_selezionato}"
-                            f" (Dispositivo: {dev_id_da_bannare}) è stato bannato con successo!"
-                        )
+                        st.success(f"Utente bannato con successo!")
                     conn.close()
                     st.rerun()
             else:
-                st.info(
-                    "Nessuna prenotazione disponibile da cui ricavare l'utente da bannare."
-                )
+                st.info("Nessuna prenotazione disponibile.")
 
-        st.markdown("##### 📋 Blacklist Dispositivi & Nominativi Associati")
+        st.markdown("##### 📋 Blacklist Dispositivi")
         conn = sqlite3.connect("prenotazioni.db")
         df_banned = pd.read_sql_query(
             """
             SELECT b.device_id, 
-                   COALESCE(GROUP_CONCAT(DISTINCT p.nome), 'Nessun nome registrato') AS nominativi_utilizzati
+                   COALESCE(GROUP_CONCAT(DISTINCT p.nome), 'Nessun nome') AS nominativi_utilizzati
             FROM banned_devices b
             LEFT JOIN prenotazioni p ON b.device_id = p.device_id
             GROUP BY b.device_id
@@ -602,7 +566,7 @@ if st.session_state["admin_logged_in"]:
         if not df_banned.empty:
             st.dataframe(df_banned, use_container_width=True)
             dev_da_sbannare = st.selectbox(
-                "Seleziona Dispositivo da rimuovere dalla blacklist",
+                "Dispositivo da rimuovere dalla blacklist",
                 df_banned["device_id"].tolist(),
                 key="sbianca_device",
             )
@@ -614,15 +578,14 @@ if st.session_state["admin_logged_in"]:
                 )
                 conn.commit()
                 conn.close()
-                st.success("Dispositivo rimosso dalla blacklist con successo!")
+                st.success("Dispositivo rimosso dalla blacklist!")
                 st.rerun()
         else:
-            st.info("Nessun dispositivo presente nella blacklist.")
+            st.info("Nessun dispositivo in blacklist.")
 
 
 # --- VISTA 2: PAGINA PRINCIPALE CLIENTE ---
 else:
-    # Controllo preventivo se il dispositivo corrente è bannato
     client_device_id = get_client_device_id()
     conn = sqlite3.connect("prenotazioni.db")
     c = conn.cursor()
@@ -638,12 +601,8 @@ else:
             c1, c2, c3 = st.columns([1, 2, 1])
             with c2:
                 st.image(logo_path, use_container_width=True)
-        st.error(
-            "⛔ Accesso negato: questo dispositivo è stato bloccato per"
-            " violazione delle regole del servizio."
-        )
+        st.error("⛔ Accesso negato: questo dispositivo è stato bloccato.")
     else:
-        # GESTIONE CHECK-IN AUTOMATICO TRAMITE QR CODE SCAN (VERIFICA CODICE FISCALE E DATA ODIERNA)
         if st.query_params.get("action") == "checkin":
             if logo_path:
                 c1, c2, c3 = st.columns([1, 2, 1])
@@ -693,9 +652,7 @@ else:
                             cf_pulito = chk_cf.strip().upper()
 
                             if not cf_pulito:
-                                st.error(
-                                    "Per favore, inserisci il tuo codice fiscale."
-                                )
+                                st.error("Per favore, inserisci il tuo codice fiscale.")
                             else:
                                 conn = sqlite3.connect("prenotazioni.db")
                                 c = conn.cursor()
@@ -713,17 +670,11 @@ else:
                                 conn.close()
 
                                 if not appuntamenti_trovati:
-                                    st.error(
-                                        "❌ Nessuna prenotazione trovata con questo Codice Fiscale per la giornata odierna."
-                                    )
+                                    st.error("❌ Nessuna prenotazione trovata con questo Codice Fiscale per oggi.")
                                 else:
                                     appuntamento_valido = None
                                     for (
-                                        p_id,
-                                        p_nome,
-                                        p_tratt,
-                                        p_ora,
-                                        p_stato,
+                                        p_id, p_nome, p_tratt, p_ora, p_stato,
                                     ) in appuntamenti_trovati:
                                         ora_app = datetime.strptime(
                                             p_ora, "%H:%M"
@@ -739,17 +690,13 @@ else:
                                             dt_app + timedelta(minutes=30)
                                         ).time()
 
-                                        # CONTROLLO ORARIO RIPRISTINATO
                                         if (
                                             inizio_finestra
                                             <= current_time
                                             <= fine_finestra
                                         ):
                                             appuntamento_valido = (
-                                                p_id,
-                                                p_nome,
-                                                p_tratt,
-                                                p_ora,
+                                                p_id, p_nome, p_tratt, p_ora
                                             )
                                             break
 
@@ -768,16 +715,12 @@ else:
                                         conn.close()
 
                                         st.session_state["checkin_successo"] = (
-                                            p_id,
-                                            p_nome,
-                                            p_tratt,
-                                            p_ora,
-                                            oggi_str,
+                                            p_id, p_nome, p_tratt, p_ora, oggi_str,
                                         )
                                         st.rerun()
                                     else:
                                         st.error(
-                                            "⏳ Il check-in è consentito solo nell'orario prossimo al tuo appuntamento (da 45 minuti prima fino a 30 minuti dopo l'orario stabilito)."
+                                            "⏳ Il check-in è consentito solo nell'orario prossimo al tuo appuntamento (da 45 minuti prima a 30 minuti dopo)."
                                         )
 
             st.markdown("<br>", unsafe_allow_html=True)
@@ -915,7 +858,6 @@ else:
 
                     if data_scelta == current_date:
                         slot_time = datetime.strptime(h, "%H:%M").time()
-                        # CONTROLLO ORARI PASSATI RIPRISTINATO
                         if slot_time <= current_time:
                             continue
 
@@ -947,18 +889,26 @@ else:
                 is_banned_now = c_check.fetchone()
                 conn_check.close()
 
+                # Validazione dei Codici Fiscali inseriti rispetto a Nome e Cognome
+                cf_valido, cf_msg = valida_codice_fiscale(nome, cognome, codice_fiscale)
+                
+                cf_2_valido = True
+                cf_2_msg = ""
+                if trattamento == "Pilates Duetto (in coppia)":
+                    cf_2_valido, cf_2_msg = valida_codice_fiscale(nome_2, cognome_2, codice_fiscale_2)
+
                 if is_banned_now:
-                    st.error(
-                        "⛔ Spiacenti, questo dispositivo è stato bloccato. Impossibile completare la prenotazione."
-                    )
+                    st.error("⛔ Spiacenti, questo dispositivo è stato bloccato.")
                 elif not nome.strip() or not cognome.strip() or not codice_fiscale.strip():
                     st.error("Per favore inserisci nome, cognome e codice fiscale.")
+                elif not cf_valido:
+                    st.error(f"❌ **Codice Fiscale non valido per {nome} {cognome}:** {cf_msg}")
                 elif trattamento == "Pilates Duetto (in coppia)" and (not nome_2.strip() or not cognome_2.strip() or not codice_fiscale_2.strip()):
-                    st.error("Per favore inserisci nome, cognome e codice fiscale anche della seconda persona per la lezione in coppia.")
+                    st.error("Per favore inserisci tutti i dati anche per la seconda persona.")
+                elif trattamento == "Pilates Duetto (in coppia)" and not cf_2_valido:
+                    st.error(f"❌ **Codice Fiscale non valido per la seconda persona ({nome_2} {cognome_2}):** {cf_2_msg}")
                 elif not ora_scelta or "Tutto occupato" in ora_scelta:
-                    st.error(
-                        "Spiacenti, non ci sono orari disponibili o lo studio è chiuso per la data selezionata."
-                    )
+                    st.error("Spiacenti, non ci sono orari disponibili per la data selezionata.")
                 else:
                     if trattamento == "Pilates Duetto (in coppia)":
                         nome_completo = f"{nome.strip()} {cognome.strip()} & {nome_2.strip()} {cognome_2.strip()}"
@@ -1000,9 +950,7 @@ else:
                         impossibile_prenotare = True
 
                     if impossibile_prenotare:
-                        st.error(
-                            "⚠️ Spiacenti, questo orario non ha più disponibilità per il trattamento scelto (potrebbe essere stato appena occupato)! Riprova con un altro orario."
-                        )
+                        st.error("⚠️ Spiacenti, questo orario è stato appena occupato! Riprova con un altro orario.")
                         conn.close()
                     else:
                         c.execute(
@@ -1049,8 +997,8 @@ else:
             st.markdown("---")
             st.markdown("#### 📱 Installa la Web App sul tuo Smartphone")
             st.markdown("""
-                Puoi aggiungere questa applicazione alla schermata principale del tuo telefono per accedere velocemente alle prenotazioni, proprio come una normale app:
-                * **🍎 iPhone / iPad (Safari):** Tocca l'icona di condivisione (il quadrato con la freccia verso l'alto) nel menu in basso e seleziona **"Aggiungi alla schermata Home"**.
+                Puoi aggiungere questa applicazione alla schermata principale del tuo telefono per accedere velocemente alle prenotazioni:
+                * **🍎 iPhone / iPad (Safari):** Tocca l'icona di condivisione nel menu in basso e seleziona **"Aggiungi alla schermata Home"**.
                 * **🤖 Android (Chrome):** Tocca i tre puntini in alto a destra nel browser e seleziona **"Aggiungi a schermata Home"** o **"Installa app"**.
                 """)
 
@@ -1060,7 +1008,7 @@ else:
             st.write("📍 **Indirizzo:** Inserisci qui l'indirizzo dello studio")
             st.markdown(
                 "📞 **Telefono / WhatsApp:** [+39 379"
-                " 2073118](tel:+393792073118) o [Scrivici su"
+                " 2073118](tel:+393792073118) o [Scrivimi su"
                 " WhatsApp](https://wa.me/393792073118)"
             )
             st.markdown(
