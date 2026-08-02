@@ -118,8 +118,21 @@ def get_orari_per_data(data):
     weekday = d.weekday()  # 0=Lun, ..., 5=Sab, 6=Dom
     if weekday == 5:  # Sabato (08:00 - 13:00)
         return ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00"]
-    elif weekday == 6:  # Domenica (Chiuso)
-        return []
+    elif weekday == 6:  # Domenica (APERTA TEMPORANEAMENTE PER TEST)
+        return [
+            "08:00",
+            "09:00",
+            "10:00",
+            "11:00",
+            "12:00",
+            "13:00",
+            "14:00",
+            "15:00",
+            "16:00",
+            "17:00",
+            "18:00",
+            "19:00",
+        ]
     else:  # Lunedì - Venerdì (08:00 - 19:00 no stop)
         return [
             "08:00",
