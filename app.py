@@ -51,6 +51,14 @@ st.markdown(
         background-color: #C2185B !important;
     }
     
+    /* Stile specifico personalizzato per rendere il pulsante di aggiornamento più sottile, orizzontale e a sinistra */
+    div[data-testid="stColumn"] div.stButton > button.btn-aggiorna {
+        padding: 6px 15px !important;
+        font-size: 0.9rem !important;
+        width: auto !important;
+        white-space: nowrap !important;
+    }
+    
     h1, h2, h3 {
         color: #880E4F !important;
         text-align: center;
@@ -200,11 +208,9 @@ if st.session_state["admin_logged_in"]:
 if st.session_state["admin_logged_in"]:
     st.title("📊 Gestione Appuntamenti & Studio (Admin)")
 
-    # Pulsante rapido per aggiornare i dati senza perdere la sessione admin
-    col_ag1, col_ag2, col_ag3 = st.columns([2, 1, 2])
-    with col_ag2:
-        if st.button("🔄 Aggiorna Dati"):
-            st.rerun()
+    # Pulsante rapido a sinistra, sottile e allungato, perfettamente allineato
+    if st.button("🔄 Aggiorna Dati", key="btn_aggiorna_dati"):
+        st.rerun()
 
     st.markdown("<br>", unsafe_allow_html=True)
 
