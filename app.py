@@ -200,6 +200,14 @@ if st.session_state["admin_logged_in"]:
 if st.session_state["admin_logged_in"]:
     st.title("📊 Gestione Appuntamenti & Studio (Admin)")
 
+    # Pulsante rapido per aggiornare i dati senza perdere la sessione admin
+    col_ag1, col_ag2, col_ag3 = st.columns([2, 1, 2])
+    with col_ag2:
+        if st.button("🔄 Aggiorna Dati"):
+            st.rerun()
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
     # 1. TABELLA APPUNTAMENTI
     with st.container(border=True):
         st.subheader("📋 Elenco Prenotazioni & Codici Fiscali")
