@@ -663,6 +663,16 @@ else:
                 "Benvenuti nello studio della **Dott.ssa Roberta Sinagra**,"
                 " specializzato in Posturologia e Pilates."
             )
+            
+            st.markdown("---")
+            st.markdown("#### 💳 Tipologie di Abbonamenti e Tariffe")
+            st.markdown("""
+                * 🏷️ **Abbonamento Trimestrale:** 3 mesi, 2 volte a settimana (massimo 3 recuperi)
+                * 🏷️ **Abbonamento Mensile:** 1 mese, 2 volte a settimana (massimo 3 recuperi)
+                * 🏷️ **Carnet 10 Lezioni:** 10 lezioni spendibili nell'arco dei 3 mesi
+                * 🏷️ **Lezione Singola:** Ingresso singolo
+                """)
+            
             st.markdown("---")
             st.markdown("#### 📱 Installa la Web App sul tuo Smartphone")
             st.markdown("""
@@ -676,15 +686,16 @@ else:
             st.markdown("### 📍 Dove Siamo & Contatti")
             st.write("📍 **Indirizzo:** Inserisci qui l'indirizzo dello studio")
             st.markdown(
-                "📞 **Telefono / WhatsApp:** [+39 345"
-                " 9472853](tel:+393459472853) o [Scrivimi su"
-                " WhatsApp](https://wa.me/393459472853)"
+                "📞 **Telefono / WhatsApp:** [+39 333"
+                " 0000000](tel:+393330000000) o [Scrivici su"
+                " WhatsApp](https://wa.me/393330000000)"
             )
 
         # TAB 4: REGOLAMENTO
         with tab4:
             st.markdown("### 📜 Regolamento dello Studio")
             st.markdown("""
+                * ⏱️ **Durata Lezione:** La lezione dura 50 minuti.
                 * 🕒 **Puntualità:** Si raccomanda di presentarsi circa 5 minuti prima dell'orario della seduta.
                 * 🧦 **Abbigliamento e Calzini:** È obbligatorio l'uso di **calzini antiscivolo** durante tutte le lezioni.
                 * 🧴 **Asciugamano:** Si richiede di portare un proprio asciugamano personale.
