@@ -706,11 +706,11 @@ else:
         # TAB 3: DOVE SIAMO
         with tab3:
             st.markdown("### 📍 Dove Siamo & Contatti")
-            st.write("📍 **Indirizzo:** Inserisci qui l'indirizzo dello studio")
+            st.write("📍 **Indirizzo:** Via Antonino di San Giuliano 55, Sant’Agata li Battiati")
             st.markdown(
-                "📞 **Telefono / WhatsApp:** [+39 333"
-                " 0000000](tel:+393330000000) o [Scrivici su"
-                " WhatsApp](https://wa.me/393330000000)"
+                "📞 **Telefono / WhatsApp:** [+39 379"
+                " 2073118](tel:+393792073118) o [Scrivici su"
+                " WhatsApp](https://wa.me/393792073118)"
             )
 
         # TAB 4: REGOLAMENTO
