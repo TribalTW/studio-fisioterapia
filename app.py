@@ -738,11 +738,8 @@ else:
                                             dt_app + timedelta(minutes=30)
                                         ).time()
 
-                                        if (
-                                            inizio_finestra
-                                            <= current_time
-                                            <= fine_finestra
-                                        ):
+                                        # MODIFICA 2 APPLICATA QUI: 'if True:' forza il check-in a prescindere dall'orario
+                                        if True:  # Temporaneo per test
                                             appuntamento_valido = (
                                                 p_id,
                                                 p_nome,
@@ -915,8 +912,9 @@ else:
 
                     if data_scelta == current_date:
                         slot_time = datetime.strptime(h, "%H:%M").time()
-                        if slot_time <= current_time:
-                            continue
+                        # MODIFICA 1 APPLICATA QUI: le righe sotto sono commentate con '#' per permettere il test di orari passati
+                        # if slot_time <= current_time:
+                        #     continue
 
                     orari_disponibili.append(h)
 
