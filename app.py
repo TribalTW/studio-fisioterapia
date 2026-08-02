@@ -190,6 +190,33 @@ def get_current_time_local():
         return datetime.now()
 
 
+# Funzione per generare il contenuto del file di calendario ICS
+def genera_file_ics(nome_trattamento, data_str, ora_str):
+    # Formato dataora inizio e fine (durata lezione stimata 50 min)
+    dt_inizio = datetime.strptime(f"{data_str} {ora_str}", "%Y-%m-%d %H:%M")
+    dt_fine = dt_inizio + timedelta(minutes=50)
+    
+    fmt = "%Y%m%dT%H%M00"
+    
+    ics_content = f"""BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Postura e Pilates//Dott.ssa Roberta Sinagra//IT
+BEGIN:VEVENT
+SUMMARY:Lezione: {nome_trattamento}
+DESCRIPTION:Appuntamento di Postura & Pilates con la Dott.ssa Roberta Sinagra. Ricorda di portare i calzini antiscivolo e un asciugamano.
+LOCATION:Studio Dott.ssa Roberta Sinagra
+DTSTART:{dt_inizio.strftime(fmt)}
+DTEND:{dt_fine.strftime(fmt)}
+BEGIN:VALARM
+TRIGGER:-PT60M
+ACTION:DISPLAY
+DESCRIPTION:Promemoria: Lezione tra 1 ora
+END:VALARM
+END:VEVENT
+END:VCALENDAR"""
+    return ics_content
+
+
 logo_path = None
 for possible_name in [
     "logo.png", "logo.PNG", "logo.jpg", "logo.jpeg", "logo.png.png",
@@ -765,246 +792,264 @@ else:
                     st.session_state["cf_2_input"] = ""
                 st.session_state["reset_form_flag"] = False
 
+            # Se è presente un messaggio di successo con file ics salvato in sessione
             if "booking_success_msg" in st.session_state:
                 st.success(st.session_state["booking_success_msg"])
-                del st.session_state["booking_success_msg"]
-
-            with st.container(border=True):
-                col_n1, col_n2, col_n3 = st.columns([2, 2, 3])
-                with col_n1:
-                    nome = st.text_input("Nome *", key="nome_input")
-                with col_n2:
-                    cognome = st.text_input("Cognome *", key="cognome_input")
-                with col_n3:
-                    codice_fiscale = st.text_input("Codice Fiscale *", key="cf_input")
-
-                trattamento = st.selectbox(
-                    "Seleziona Trattamento / Lezione *",
-                    [
-                        "Valutazione Posturale",
-                        "Lezione Pilates Individuale",
-                        "Pilates Duetto (in coppia)",
-                        "Rieducazione Posturale Motorìa",
-                    ],
-                    key="trattamento_input",
-                )
-
-                nome_2 = ""
-                cognome_2 = ""
-                codice_fiscale_2 = ""
-                if trattamento == "Pilates Duetto (in coppia)":
-                    st.markdown("---")
-                    st.markdown("##### 👥 Dati Seconda Persona (Coppia)")
-                    col_n4, col_n5, col_n6 = st.columns([2, 2, 3])
-                    with col_n4:
-                        nome_2 = st.text_input("Nome Seconda Persona *", key="nome_2_input")
-                    with col_n5:
-                        cognome_2 = st.text_input("Cognome Seconda Persona *", key="cognome_2_input")
-                    with col_n6:
-                        codice_fiscale_2 = st.text_input("Codice Fiscale 2ª Persona *", key="cf_2_input")
-
-                col1, col2 = st.columns(2)
-
-                with col1:
-                    data_scelta = st.date_input(
-                        "Seleziona Data *", min_value=datetime.today(), key="data_input"
-                    )
-
-                conn = sqlite3.connect("prenotazioni.db")
-                c = conn.cursor()
-                c.execute(
-                    "SELECT ora, trattamento, codice_fiscale, codice_fiscale_2, device_id FROM prenotazioni WHERE data = ?",
-                    (str(data_scelta),),
-                )
-                prenotazioni_giorno = c.fetchall()
-                conn.close()
-
-                TUTTI_GLI_ORARI = get_orari_per_data(data_scelta)
-                current_datetime = get_current_time_local()
-                current_date = current_datetime.date()
-                current_time = current_datetime.time()
-
-                # Ricaviamo i codici fiscali inseriti temporaneamente (se l'utente li sta compilando)
-                cf_curr = codice_fiscale.strip().upper() if codice_fiscale else ""
-                cf_curr_2 = codice_fiscale_2.strip().upper() if codice_fiscale_2 else ""
-
-                orari_disponibili = []
-                for h in TUTTI_GLI_ORARI:
-                    posti_occupati = 0
-                    slot_bloccato = False
-                    utente_gia_prenotato = False
-
-                    for p_ora, p_trattamento, p_cf1, p_cf2, p_dev in prenotazioni_giorno:
-                        if p_ora == h:
-                            if (
-                                p_trattamento in ("Chiusura Admin", "🔒 STUDIO CHIUSO")
-                                or "CHIUSO" in p_trattamento
-                            ):
-                                slot_bloccato = True
-                                break
-                            
-                            # Controlliamo se questo utente (per device o per codice fiscale) ha già prenotato questo slot
-                            if p_dev == client_device_id:
-                                utente_gia_prenotato = True
-                            if cf_curr and (p_cf1 == cf_curr or p_cf2 == cf_curr or p_cf1 == cf_curr_2 or p_cf2 == cf_curr_2):
-                                utente_gia_prenotato = True
-                            if cf_curr_2 and (p_cf1 == cf_curr_2 or p_cf2 == cf_curr_2):
-                                utente_gia_prenotato = True
-
-                            if p_trattamento == "Pilates Duetto (in coppia)":
-                                posti_occupati += 2
-                            else:
-                                posti_occupati += 1
-
-                    if slot_bloccato or utente_gia_prenotato:
-                        continue
-
-                    if trattamento == "Pilates Duetto (in coppia)":
-                        if posti_occupati > 0:
-                            continue
-                    else:
-                        if posti_occupati >= 2:
-                            continue
-
-                    if data_scelta == current_date:
-                        slot_time = datetime.strptime(h, "%H:%M").time()
-                        if slot_time <= current_time:
-                            continue
-
-                    orari_disponibili.append(h)
-
-                with col2:
-                    if orari_disponibili:
-                        ora_scelta = st.selectbox(
-                            "Seleziona Ora *", orari_disponibili, key="ora_input"
-                        )
-                    else:
-                        st.selectbox(
-                            "Seleziona Ora *",
-                            ["Tutto occupato / Chiuso / Già prenotato"],
-                            disabled=True,
-                            key="dis_ora_occupato",
-                        )
-                        ora_scelta = None
-
-                submitted = st.button("Conferma Prenotazione")
-
-            if submitted:
-                conn_check = sqlite3.connect("prenotazioni.db")
-                c_check = conn_check.cursor()
-                c_check.execute(
-                    "SELECT device_id FROM banned_devices WHERE device_id = ?",
-                    (client_device_id,),
-                )
-                is_banned_now = c_check.fetchone()
-                conn_check.close()
-
-                # Validazione dei Codici Fiscali inseriti rispetto a Nome e Cognome
-                cf_valido, cf_msg = valida_codice_fiscale(nome, cognome, codice_fiscale)
                 
-                cf_2_valido = True
-                cf_2_msg = ""
-                if trattamento == "Pilates Duetto (in coppia)":
-                    cf_2_valido, cf_2_msg = valida_codice_fiscale(nome_2, cognome_2, codice_fiscale_2)
-
-                cf_principale = codice_fiscale.strip().upper()
-                cf_secondario = codice_fiscale_2.strip().upper() if trattamento == "Pilates Duetto (in coppia)" else None
-
-                # Controllo aggiuntivo se l'utente ha già una prenotazione in questo orario nel DB
-                conn_dupl = sqlite3.connect("prenotazioni.db")
-                c_dupl = conn_dupl.cursor()
-                c_dupl.execute(
-                    """SELECT id FROM prenotazioni 
-                       WHERE data = ? AND ora = ? 
-                         AND (device_id = ? OR UPPER(codice_fiscale) = ? OR UPPER(codice_fiscale_2) = ? 
-                              OR (? IS NOT NULL AND (UPPER(codice_fiscale) = ? OR UPPER(codice_fiscale_2) = ?)))""",
-                    (
-                        str(data_scelta), ora_scelta, 
-                        client_device_id, cf_principale, cf_principale,
-                        cf_secondario, cf_secondario, cf_secondario
+                if "ics_data" in st.session_state:
+                    st.markdown("---")
+                    st.markdown("#### 📱 Sincronizza con il tuo calendario")
+                    st.write("Tocca il pulsante qui sotto per aggiungere subito l'appuntamento al calendario del tuo smartphone (Apple Calendar, Google Calendar, ecc.) con promemoria automatico:")
+                    st.download_button(
+                        label="📅 Aggiungi al Calendario (Crea Promemoria)",
+                        data=st.session_state["ics_data"],
+                        file_name="appuntamento_pilates.ics",
+                        mime="text/calendar",
                     )
-                )
-                gia_presente = c_dupl.fetchone()
-                conn_dupl.close()
+                    st.markdown("---")
 
-                if is_banned_now:
-                    st.error("⛔ Spiacenti, questo dispositivo è stato bloccato.")
-                elif not nome.strip() or not cognome.strip() or not codice_fiscale.strip():
-                    st.error("Per favore inserisci nome, cognome e codice fiscale.")
-                elif not cf_valido:
-                    st.error(f"❌ **Codice Fiscale non valido per {nome} {cognome}:** {cf_msg}")
-                elif trattamento == "Pilates Duetto (in coppia)" and (not nome_2.strip() or not cognome_2.strip() or not codice_fiscale_2.strip()):
-                    st.error("Per favore inserisci tutti i dati anche per la seconda persona.")
-                elif trattamento == "Pilates Duetto (in coppia)" and not cf_2_valido:
-                    st.error(f"❌ **Codice Fiscale non valido per la seconda persona ({nome_2} {cognome_2}):** {cf_2_msg}")
-                elif gia_presente:
-                    st.error("⚠️ Hai già una prenotazione attiva in questo giorno e orario (oppure uno dei partecipanti risulta già registrato nello stesso slot).")
-                elif not ora_scelta or "Tutto occupato" in ora_scelta or "Già prenotato" in ora_scelta:
-                    st.error("Spiacenti, non ci sono orari disponibili per la data selezionata.")
-                else:
+                if st.button("Effettua una nuova prenotazione"):
+                    del st.session_state["booking_success_msg"]
+                    if "ics_data" in st.session_state:
+                        del st.session_state["ics_data"]
+                    st.rerun()
+            else:
+                with st.container(border=True):
+                    col_n1, col_n2, col_n3 = st.columns([2, 2, 3])
+                    with col_n1:
+                        nome = st.text_input("Nome *", key="nome_input")
+                    with col_n2:
+                        cognome = st.text_input("Cognome *", key="cognome_input")
+                    with col_n3:
+                        codice_fiscale = st.text_input("Codice Fiscale *", key="cf_input")
+
+                    trattamento = st.selectbox(
+                        "Seleziona Trattamento / Lezione *",
+                        [
+                            "Valutazione Posturale",
+                            "Lezione Pilates Individuale",
+                            "Pilates Duetto (in coppia)",
+                            "Rieducazione Posturale Motorìa",
+                        ],
+                        key="trattamento_input",
+                    )
+
+                    nome_2 = ""
+                    cognome_2 = ""
+                    codice_fiscale_2 = ""
                     if trattamento == "Pilates Duetto (in coppia)":
-                        nome_completo = f"{nome.strip()} {cognome.strip()} & {nome_2.strip()} {cognome_2.strip()}"
-                    else:
-                        nome_completo = f"{nome.strip()} {cognome.strip()}"
+                        st.markdown("---")
+                        st.markdown("##### 👥 Dati Seconda Persona (Coppia)")
+                        col_n4, col_n5, col_n6 = st.columns([2, 2, 3])
+                        with col_n4:
+                            nome_2 = st.text_input("Nome Seconda Persona *", key="nome_2_input")
+                        with col_n5:
+                            cognome_2 = st.text_input("Cognome Seconda Persona *", key="cognome_2_input")
+                        with col_n6:
+                            codice_fiscale_2 = st.text_input("Codice Fiscale 2ª Persona *", key="cf_2_input")
+
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        data_scelta = st.date_input(
+                            "Seleziona Data *", min_value=datetime.today(), key="data_input"
+                        )
 
                     conn = sqlite3.connect("prenotazioni.db")
                     c = conn.cursor()
                     c.execute(
-                        "SELECT trattamento FROM prenotazioni WHERE data = ? AND ora = ?",
-                        (str(data_scelta), ora_scelta),
+                        "SELECT ora, trattamento, codice_fiscale, codice_fiscale_2, device_id FROM prenotazioni WHERE data = ?",
+                        (str(data_scelta),),
                     )
-                    esistenti = c.fetchall()
+                    prenotazioni_giorno = c.fetchall()
+                    conn.close()
 
-                    slot_occupato = False
-                    posti_occupati = 0
-                    for (p_trattamento,) in esistenti:
-                        if (
-                            p_trattamento in ("Chiusura Admin", "🔒 STUDIO CHIUSO")
-                            or "CHIUSO" in p_trattamento
-                        ):
-                            slot_occupato = True
-                            break
-                        elif p_trattamento == "Pilates Duetto (in coppia)":
-                            posti_occupati += 2
+                    TUTTI_GLI_ORARI = get_orari_per_data(data_scelta)
+                    current_datetime = get_current_time_local()
+                    current_date = current_datetime.date()
+                    current_time = current_datetime.time()
+
+                    cf_curr = codice_fiscale.strip().upper() if codice_fiscale else ""
+                    cf_curr_2 = codice_fiscale_2.strip().upper() if codice_fiscale_2 else ""
+
+                    orari_disponibili = []
+                    for h in TUTTI_GLI_ORARI:
+                        posti_occupati = 0
+                        slot_bloccato = False
+                        utente_gia_prenotato = False
+
+                        for p_ora, p_trattamento, p_cf1, p_cf2, p_dev in prenotazioni_giorno:
+                            if p_ora == h:
+                                if (
+                                    p_trattamento in ("Chiusura Admin", "🔒 STUDIO CHIUSO")
+                                    or "CHIUSO" in p_trattamento
+                                ):
+                                    slot_bloccato = True
+                                    break
+                                
+                                if p_dev == client_device_id:
+                                    utente_gia_prenotato = True
+                                if cf_curr and (p_cf1 == cf_curr or p_cf2 == cf_curr or p_cf1 == cf_curr_2 or p_cf2 == cf_curr_2):
+                                    utente_gia_prenotato = True
+                                if cf_curr_2 and (p_cf1 == cf_curr_2 or p_cf2 == cf_curr_2):
+                                    utente_gia_prenotato = True
+
+                                if p_trattamento == "Pilates Duetto (in coppia)":
+                                    posti_occupati += 2
+                                else:
+                                    posti_occupati += 1
+
+                        if slot_bloccato or utente_gia_prenotato:
+                            continue
+
+                        if trattamento == "Pilates Duetto (in coppia)":
+                            if posti_occupati > 0:
+                                continue
                         else:
-                            posti_occupati += 1
+                            if posti_occupati >= 2:
+                                continue
 
-                    impossibile_prenotare = False
-                    if slot_occupato:
-                        impossibile_prenotare = True
-                    elif trattamento == "Pilates Duetto (in coppia)" and posti_occupati > 0:
-                        impossibile_prenotare = True
-                    elif trattamento != "Pilates Duetto (in coppia)" and posti_occupati >= 2:
-                        impossibile_prenotare = True
+                        if data_scelta == current_date:
+                            slot_time = datetime.strptime(h, "%H:%M").time()
+                            if slot_time <= current_time:
+                                continue
 
-                    if impossibile_prenotare:
-                        st.error("⚠️ Spiacenti, questo orario è stato appena occupato! Riprova con un altro orario.")
-                        conn.close()
+                        orari_disponibili.append(h)
+
+                    with col2:
+                        if orari_disponibili:
+                            ora_scelta = st.selectbox(
+                                "Seleziona Ora *", orari_disponibili, key="ora_input"
+                            )
+                        else:
+                            st.selectbox(
+                                "Seleziona Ora *",
+                                ["Tutto occupato / Chiuso / Già prenotato"],
+                                disabled=True,
+                                key="dis_ora_occupato",
+                            )
+                            ora_scelta = None
+
+                    submitted = st.button("Conferma Prenotazione")
+
+                if submitted:
+                    conn_check = sqlite3.connect("prenotazioni.db")
+                    c_check = conn_check.cursor()
+                    c_check.execute(
+                        "SELECT device_id FROM banned_devices WHERE device_id = ?",
+                        (client_device_id,),
+                    )
+                    is_banned_now = c_check.fetchone()
+                    conn_check.close()
+
+                    cf_valido, cf_msg = valida_codice_fiscale(nome, cognome, codice_fiscale)
+                    
+                    cf_2_valido = True
+                    cf_2_msg = ""
+                    if trattamento == "Pilates Duetto (in coppia)":
+                        cf_2_valido, cf_2_msg = valida_codice_fiscale(nome_2, cognome_2, codice_fiscale_2)
+
+                    cf_principale = codice_fiscale.strip().upper()
+                    cf_secondario = codice_fiscale_2.strip().upper() if trattamento == "Pilates Duetto (in coppia)" else None
+
+                    conn_dupl = sqlite3.connect("prenotazioni.db")
+                    c_dupl = conn_dupl.cursor()
+                    c_dupl.execute(
+                        """SELECT id FROM prenotazioni 
+                           WHERE data = ? AND ora = ? 
+                             AND (device_id = ? OR UPPER(codice_fiscale) = ? OR UPPER(codice_fiscale_2) = ? 
+                                  OR (? IS NOT NULL AND (UPPER(codice_fiscale) = ? OR UPPER(codice_fiscale_2) = ?)))""",
+                        (
+                            str(data_scelta), ora_scelta, 
+                            client_device_id, cf_principale, cf_principale,
+                            cf_secondario, cf_secondario, cf_secondario
+                        )
+                    )
+                    gia_presente = c_dupl.fetchone()
+                    conn_dupl.close()
+
+                    if is_banned_now:
+                        st.error("⛔ Spiacenti, questo dispositivo è stato bloccato.")
+                    elif not nome.strip() or not cognome.strip() or not codice_fiscale.strip():
+                        st.error("Per favore inserisci nome, cognome e codice fiscale.")
+                    elif not cf_valido:
+                        st.error(f"❌ **Codice Fiscale non valido per {nome} {cognome}:** {cf_msg}")
+                    elif trattamento == "Pilates Duetto (in coppia)" and (not nome_2.strip() or not cognome_2.strip() or not codice_fiscale_2.strip()):
+                        st.error("Per favore inserisci tutti i dati anche per la seconda persona.")
+                    elif trattamento == "Pilates Duetto (in coppia)" and not cf_2_valido:
+                        st.error(f"❌ **Codice Fiscale non valido per la seconda persona ({nome_2} {cognome_2}):** {cf_2_msg}")
+                    elif gia_presente:
+                        st.error("⚠️ Hai già una prenotazione attiva in questo giorno e orario (oppure uno dei partecipanti risulta già registrato nello stesso slot).")
+                    elif not ora_scelta or "Tutto occupato" in ora_scelta or "Già prenotato" in ora_scelta:
+                        st.error("Spiacenti, non ci sono orari disponibili per la data selezionata.")
                     else:
-                        data_creazione_str = get_current_time_local().strftime("%Y-%m-%d %H:%M")
-                        c.execute(
-                            "INSERT INTO prenotazioni (nome, data, ora, trattamento, data_creazione, device_id, stato_presenza, codice_fiscale, codice_fiscale_2) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                            (
-                                nome_completo,
-                                str(data_scelta),
-                                ora_scelta,
-                                trattamento,
-                                data_creazione_str,
-                                client_device_id,
-                                "Assente",
-                                cf_principale,
-                                cf_secondario,
-                            ),
-                        )
-                        conn.commit()
-                        conn.close()
+                        if trattamento == "Pilates Duetto (in coppia)":
+                            nome_completo = f"{nome.strip()} {cognome.strip()} & {nome_2.strip()} {cognome_2.strip()}"
+                        else:
+                            nome_completo = f"{nome.strip()} {cognome.strip()}"
 
-                        data_formattata = data_scelta.strftime("%d/%m/%Y")
-                        st.session_state["booking_success_msg"] = (
-                            f"🎉 PRENOTAZIONE CONFERMATA!\n\nGrazie {nome.strip()} {cognome.strip()}, ti aspetto il {data_formattata} alle ore {ora_scelta} per {trattamento}."
+                        conn = sqlite3.connect("prenotazioni.db")
+                        c = conn.cursor()
+                        c.execute(
+                            "SELECT trattamento FROM prenotazioni WHERE data = ? AND ora = ?",
+                            (str(data_scelta), ora_scelta),
                         )
-                        st.session_state["reset_form_flag"] = True
-                        st.rerun()
+                        esistenti = c.fetchall()
+
+                        slot_occupato = False
+                        posti_occupati = 0
+                        for (p_trattamento,) in esistenti:
+                            if (
+                                p_trattamento in ("Chiusura Admin", "🔒 STUDIO CHIUSO")
+                                or "CHIUSO" in p_trattamento
+                            ):
+                                slot_occupato = True
+                                break
+                            elif p_trattamento == "Pilates Duetto (in coppia)":
+                                posti_occupati += 2
+                            else:
+                                posti_occupati += 1
+
+                        impossibile_prenotare = False
+                        if slot_occupato:
+                            impossibile_prenotare = True
+                        elif trattamento == "Pilates Duetto (in coppia)" and posti_occupati > 0:
+                            impossibile_prenotare = True
+                        elif trattamento != "Pilates Duetto (in coppia)" and posti_occupati >= 2:
+                            impossibile_prenotare = True
+
+                        if impossibile_prenotare:
+                            st.error("⚠️ Spiacenti, questo orario è stato appena occupato! Riprova con un altro orario.")
+                            conn.close()
+                        else:
+                            data_creazione_str = get_current_time_local().strftime("%Y-%m-%d %H:%M")
+                            c.execute(
+                                "INSERT INTO prenotazioni (nome, data, ora, trattamento, data_creazione, device_id, stato_presenza, codice_fiscale, codice_fiscale_2) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                (
+                                    nome_completo,
+                                    str(data_scelta),
+                                    ora_scelta,
+                                    trattamento,
+                                    data_creazione_str,
+                                    client_device_id,
+                                    "Assente",
+                                    cf_principale,
+                                    cf_secondario,
+                                ),
+                            )
+                            conn.commit()
+                            conn.close()
+
+                            # Generazione del file ICS di calendario
+                            ics_string = genera_file_ics(trattamento, str(data_scelta), ora_scelta)
+
+                            data_formattata = data_scelta.strftime("%d/%m/%Y")
+                            st.session_state["booking_success_msg"] = (
+                                f"🎉 PRENOTAZIONE CONFERMATA!\n\nGrazie {nome.strip()} {cognome.strip()}, ti aspetto il {data_formattata} alle ore {ora_scelta} per {trattamento}."
+                            )
+                            st.session_state["ics_data"] = ics_string
+                            st.session_state["reset_form_flag"] = True
+                            st.rerun()
 
         # TAB 2: INFO STUDIO
         with tab2:
