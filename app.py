@@ -349,7 +349,7 @@ if st.session_state["admin_logged_in"]:
             else:
                 st.info("Nastro dati insufficiente per le statistiche.")
 
-    # 3. SEZIONE QR CODE CHECK-IN STUDIO (CON MANTENIMENTO DEL DEV_ID)
+    # 3. SEZIONE QR CODE CHECK-IN STUDIO
     with st.container(border=True):
         st.subheader("📷 QR Code Check-in Ingresso Studio")
         st.write(
@@ -367,13 +367,8 @@ if st.session_state["admin_logged_in"]:
         <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
         <script>
         (function() {
-            var urlParams = new URLSearchParams(window.parent.location.search);
-            var devId = urlParams.get('dev_id');
             var parentUrl = window.parent.location.href.split('?')[0];
             var checkinUrl = parentUrl + '?action=checkin';
-            if (devId) {
-                checkinUrl += '&dev_id=' + devId;
-            }
             
             var qr = new QRious({
                 element: document.createElement('canvas'),
@@ -646,7 +641,7 @@ else:
             " violazione delle regole del servizio."
         )
     else:
-        # GESTIONE CHECK-IN AUTOMATICO TRAMITE QR CODE SCAN (VERIFICA NOME E STESSO DISPOSITIVO)
+        # GESTIONE CHECK-IN AUTOMATICO TRAMITE QR CODE SCAN (VERIFICA NOME E DATA ODIERNA)
         if st.query_params.get("action") == "checkin":
             if logo_path:
                 c1, c2, c3 = st.columns([1, 2, 1])
@@ -687,22 +682,26 @@ else:
                         "**Benvenuto/a in studio! 🧘‍♀️ Inserisci il tuo Nome e Cognome per confermare l'arrivo:**"
                     )
                     with st.form("form_checkin_cliente_automatico"):
-                        nome_inserito = st.text_input(
-                            "Inserisci Nome e Cognome esatti *"
-                        )
+                        col_chk1, col_chk2 = st.columns(2)
+                        with col_chk1:
+                            chk_nome = st.text_input("Il tuo Nome *")
+                        with col_chk2:
+                            chk_cognome = st.text_input("Il tuo Cognome *")
+
                         submit_checkin = st.form_submit_button(
                             "✅ Conferma la mia Presenza"
                         )
 
                         if submit_checkin:
-                            nome_pulito = nome_inserito.strip()
+                            nome_pulito = chk_nome.strip()
+                            cognome_pulito = chk_cognome.strip()
 
-                            if not nome_pulito:
+                            if not nome_pulito or not cognome_pulito:
                                 st.error(
-                                    "Per favore, inserisci il tuo nome e cognome."
+                                    "Per favore, inserisci sia il tuo nome che il tuo cognome."
                                 )
                             else:
-                                # CONTROLLO SICURO E AUTOMATICO: Nome esatto + Stesso Smartphone (device_id)
+                                stringa_cercata = f"{nome_pulito} {cognome_pulito}".lower()
                                 conn = sqlite3.connect("prenotazioni.db")
                                 c = conn.cursor()
                                 c.execute(
@@ -711,20 +710,18 @@ else:
                                     FROM prenotazioni 
                                     WHERE data = ? 
                                       AND device_id != 'SYSTEM' 
-                                      AND LOWER(nome) = ? 
-                                      AND device_id = ?
+                                      AND LOWER(nome) LIKE ?
                                     """,
-                                    (oggi_str, nome_pulito.lower(), client_device_id),
+                                    (oggi_str, f"%{stringa_cercata}%"),
                                 )
                                 appuntamenti_trovati = c.fetchall()
                                 conn.close()
 
                                 if not appuntamenti_trovati:
                                     st.error(
-                                        "❌ Nessuna prenotazione trovata con questo nome effettuata da questo smartphone per la giornata odierna."
+                                        "❌ Nessuna prenotazione trovata con questo nome e cognome per la giornata odierna."
                                     )
                                 else:
-                                    # Filtriamo gli appuntamenti in base alla fascia oraria valida (da 45 min prima a 30 min dopo)
                                     appuntamento_valido = None
                                     for (
                                         p_id,
@@ -817,6 +814,11 @@ else:
 
             if st.session_state.get("reset_nome_flag", False):
                 st.session_state["nome_input"] = ""
+                st.session_state["cognome_input"] = ""
+                if "nome_2_input" in st.session_state:
+                    st.session_state["nome_2_input"] = ""
+                if "cognome_2_input" in st.session_state:
+                    st.session_state["cognome_2_input"] = ""
                 st.session_state["reset_nome_flag"] = False
 
             if "booking_success_msg" in st.session_state:
@@ -824,7 +826,13 @@ else:
                 del st.session_state["booking_success_msg"]
 
             with st.container(border=True):
-                nome = st.text_input("Nome e Cognome *", key="nome_input")
+                # Campi Nome e Cognome separati per la persona principale
+                col_n1, col_n2 = st.columns(2)
+                with col_n1:
+                    nome = st.text_input("Nome *", key="nome_input")
+                with col_n2:
+                    cognome = st.text_input("Cognome *", key="cognome_input")
+
                 trattamento = st.selectbox(
                     "Seleziona Trattamento / Lezione *",
                     [
@@ -835,6 +843,18 @@ else:
                     ],
                     key="trattamento_input",
                 )
+
+                # Gestione campi dinamici per la seconda persona se è Pilates Duetto
+                nome_2 = ""
+                cognome_2 = ""
+                if trattamento == "Pilates Duetto (in coppia)":
+                    st.markdown("---")
+                    st.markdown("##### 👥 Dati Seconda Persona (Coppia)")
+                    col_n3, col_n4 = st.columns(2)
+                    with col_n3:
+                        nome_2 = st.text_input("Nome Seconda Persona *", key="nome_2_input")
+                    with col_n4:
+                        cognome_2 = st.text_input("Cognome Seconda Persona *", key="cognome_2_input")
 
                 col1, col2 = st.columns(2)
 
@@ -928,13 +948,21 @@ else:
                     st.error(
                         "⛔ Spiacenti, questo dispositivo è stato bloccato. Impossibile completare la prenotazione."
                     )
-                elif not nome.strip():
-                    st.error("Per favore inserisci il tuo nome e cognome.")
+                elif not nome.strip() or not cognome.strip():
+                    st.error("Per favore inserisci sia il tuo nome che il tuo cognome.")
+                elif trattamento == "Pilates Duetto (in coppia)" and (not nome_2.strip() or not cognome_2.strip()):
+                    st.error("Per favore inserisci nome e cognome anche della seconda persona per la lezione in coppia.")
                 elif not ora_scelta or "Tutto occupato" in ora_scelta:
                     st.error(
                         "Spiacenti, non ci sono orari disponibili o lo studio è chiuso per la data selezionata."
                     )
                 else:
+                    # Uniamo nome e cognome (e eventualmente seconda persona) in un'unica stringa pulita per il database
+                    if trattamento == "Pilates Duetto (in coppia)":
+                        nome_completo = f"{nome.strip()} {cognome.strip()} & {nome_2.strip()} {cognome_2.strip()}"
+                    else:
+                        nome_completo = f"{nome.strip()} {cognome.strip()}"
+
                     conn = sqlite3.connect("prenotazioni.db")
                     c = conn.cursor()
                     c.execute(
@@ -974,7 +1002,7 @@ else:
                         c.execute(
                             "INSERT INTO prenotazioni (nome, data, ora, trattamento, data_creazione, device_id, stato_presenza) VALUES (?, ?, ?, ?, ?, ?, ?)",
                             (
-                                nome,
+                                nome_completo,
                                 str(data_scelta),
                                 ora_scelta,
                                 trattamento,
@@ -988,7 +1016,7 @@ else:
 
                         data_formattata = data_scelta.strftime("%d/%m/%Y")
                         st.session_state["booking_success_msg"] = (
-                            f"🎉 PRENOTAZIONE CONFERMATA!\n\nGrazie {nome}, ti aspettiamo il {data_formattata} alle ore {ora_scelta} per {trattamento}."
+                            f"🎉 PRENOTAZIONE CONFERMATA!\n\nGrazie {nome.strip()} {cognome.strip()}, ti aspettiamo il {data_formattata} alle ore {ora_scelta} per {trattamento}."
                         )
                         st.session_state["reset_nome_flag"] = True
                         st.rerun()
