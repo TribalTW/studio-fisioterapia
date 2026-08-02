@@ -119,21 +119,8 @@ def get_orari_per_data(data):
     weekday = d.weekday()  # 0=Lun, ..., 5=Sab, 6=Dom
     if weekday == 5:  # Sabato (08:00 - 13:00)
         return ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00"]
-    elif weekday == 6:  # Domenica (APERTA TEMPORANEAMENTE PER TEST)
-        return [
-            "08:00",
-            "09:00",
-            "10:00",
-            "11:00",
-            "12:00",
-            "13:00",
-            "14:00",
-            "15:00",
-            "16:00",
-            "17:00",
-            "18:00",
-            "19:00",
-        ]
+    elif weekday == 6:  # Domenica (Chiuso)
+        return []
     else:  # Lunedì - Venerdì (08:00 - 19:00 no stop)
         return [
             "08:00",
@@ -651,7 +638,6 @@ else:
 
             st.title("📍 Check-in Ingresso Studio")
             
-            # CORRETTO CON FUSO ORARIO ITALIANO
             try:
                 local_tz = ZoneInfo("Europe/Rome")
                 current_dt = datetime.now(local_tz)
@@ -739,8 +725,12 @@ else:
                                             dt_app + timedelta(minutes=30)
                                         ).time()
 
-                                        # MODIFICA PER TEST: 'if True:' forza il check-in a prescindere dall'orario
-                                        if True:  # Temporaneo per test
+                                        # CONTROLLO ORARIO RIPRISTINATO
+                                        if (
+                                            inizio_finestra
+                                            <= current_time
+                                            <= fine_finestra
+                                        ):
                                             appuntamento_valido = (
                                                 p_id,
                                                 p_nome,
@@ -821,7 +811,6 @@ else:
                 del st.session_state["booking_success_msg"]
 
             with st.container(border=True):
-                # Campi Nome, Cognome e Codice Fiscale separati per la persona principale
                 col_n1, col_n2, col_n3 = st.columns([2, 2, 3])
                 with col_n1:
                     nome = st.text_input("Nome *", key="nome_input")
@@ -841,7 +830,6 @@ else:
                     key="trattamento_input",
                 )
 
-                # Gestione campi dinamici per la seconda persona se è Pilates Duetto
                 nome_2 = ""
                 cognome_2 = ""
                 codice_fiscale_2 = ""
@@ -913,9 +901,9 @@ else:
 
                     if data_scelta == current_date:
                         slot_time = datetime.strptime(h, "%H:%M").time()
-                        # MODIFICA PER TEST: commentato per permettere di prenotare orari passati oggi
-                        # if slot_time <= current_time:
-                        #     continue
+                        # CONTROLLO ORARI PASSATI RIPRISTINATO
+                        if slot_time <= current_time:
+                            continue
 
                     orari_disponibili.append(h)
 
