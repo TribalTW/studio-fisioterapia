@@ -650,14 +650,15 @@ else:
                     st.image(logo_path, use_container_width=True)
 
             st.title("📍 Check-in Ingresso Studio")
-            oggi_str = datetime.today().strftime("%Y-%m-%d")
-
+            
+            # CORRETTO CON FUSO ORARIO ITALIANO
             try:
                 local_tz = ZoneInfo("Europe/Rome")
                 current_dt = datetime.now(local_tz)
             except Exception:
                 current_dt = datetime.now()
 
+            oggi_str = current_dt.strftime("%Y-%m-%d")
             current_time = current_dt.time()
 
             if "checkin_successo" in st.session_state:
@@ -738,7 +739,7 @@ else:
                                             dt_app + timedelta(minutes=30)
                                         ).time()
 
-                                        # MODIFICA 2 APPLICATA QUI: 'if True:' forza il check-in a prescindere dall'orario
+                                        # MODIFICA PER TEST: 'if True:' forza il check-in a prescindere dall'orario
                                         if True:  # Temporaneo per test
                                             appuntamento_valido = (
                                                 p_id,
@@ -912,7 +913,7 @@ else:
 
                     if data_scelta == current_date:
                         slot_time = datetime.strptime(h, "%H:%M").time()
-                        # MODIFICA 1 APPLICATA QUI: le righe sotto sono commentate con '#' per permettere il test di orari passati
+                        # MODIFICA PER TEST: commentato per permettere di prenotare orari passati oggi
                         # if slot_time <= current_time:
                         #     continue
 
