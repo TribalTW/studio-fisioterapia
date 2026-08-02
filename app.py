@@ -349,7 +349,7 @@ if st.session_state["admin_logged_in"]:
             else:
                 st.info("Nastro dati insufficiente per le statistiche.")
 
-    # 3. SEZIONE QR CODE CHECK-IN STUDIO
+    # 3. SEZIONE QR CODE CHECK-IN STUDIO (CON MANTENIMENTO DEL DEV_ID)
     with st.container(border=True):
         st.subheader("📷 QR Code Check-in Ingresso Studio")
         st.write(
@@ -367,8 +367,13 @@ if st.session_state["admin_logged_in"]:
         <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
         <script>
         (function() {
+            var urlParams = new URLSearchParams(window.parent.location.search);
+            var devId = urlParams.get('dev_id');
             var parentUrl = window.parent.location.href.split('?')[0];
             var checkinUrl = parentUrl + '?action=checkin';
+            if (devId) {
+                checkinUrl += '&dev_id=' + devId;
+            }
             
             var qr = new QRious({
                 element: document.createElement('canvas'),
