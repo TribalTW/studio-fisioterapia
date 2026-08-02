@@ -136,7 +136,7 @@ def get_orari_per_data(data):
         ]
 
 
-# Identificazione univoca persistente tramite LocalStorage con schermata di caricamento e anti-cache
+# Identificazione univoca persistente tramite LocalStorage (Preserva tutti i parametri della URL come action=checkin)
 def get_client_device_id():
     if "dev_id" not in st.query_params or not st.query_params["dev_id"].strip():
         components.html(
@@ -150,8 +150,11 @@ def get_client_device_id():
             devId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
             localStorage.setItem('pilates_dev_id', devId);
         }
-        if (!window.location.search.includes('dev_id=' + devId)) {
-            window.location.href = window.location.pathname + '?dev_id=' + devId + '&_=' + new Date().getTime();
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        if (!urlParams.has('dev_id') || urlParams.get('dev_id') !== devId) {
+            urlParams.set('dev_id', devId);
+            window.location.href = window.location.pathname + '?' + urlParams.toString();
         }
         </script>
         """,
@@ -341,7 +344,7 @@ if st.session_state["admin_logged_in"]:
             else:
                 st.info("Nastro dati insufficiente per le statistiche.")
 
-    # 3. SEZIONE QR CODE CHECK-IN STUDIO (CORRETTO)
+    # 3. SEZIONE QR CODE CHECK-IN STUDIO
     with st.container(border=True):
         st.subheader("📷 QR Code Check-in Ingresso Studio")
         st.write(
@@ -359,7 +362,6 @@ if st.session_state["admin_logged_in"]:
         <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
         <script>
         (function() {
-            // Ottiene l'indirizzo reale della pagina principale rimuovendo eventuali parametri
             var parentUrl = window.parent.location.href.split('?')[0];
             var checkinUrl = parentUrl + '?action=checkin';
             
@@ -634,7 +636,7 @@ else:
             " violazione delle regole del servizio."
         )
     else:
-        # GESTIONE CHECK-IN TRAMITE QR CODE SCAN
+        # GESTIONE CHECK-IN AUTOMATICO TRAMITE QR CODE SCAN
         if st.query_params.get("action") == "checkin":
             if logo_path:
                 c1, c2, c3 = st.columns([1, 2, 1])
@@ -655,35 +657,37 @@ else:
 
             if prenotazione_oggi:
                 p_id, p_nome, p_tratt, p_ora, p_stato = prenotazione_oggi
+
+                # Se non era ancora registrato come presente, aggiorniamo automaticamente in automatico
+                if p_stato != "Presente":
+                    conn = sqlite3.connect("prenotazioni.db")
+                    c = conn.cursor()
+                    c.execute(
+                        "UPDATE prenotazioni SET stato_presenza = 'Presente' WHERE id = ?",
+                        (p_id,),
+                    )
+                    conn.commit()
+                    conn.close()
+                    st.balloons()
+
                 with st.container(border=True):
                     st.markdown(f"### Ciao {p_nome}! 🧘‍♀️")
+                    st.success("🎉 **Presenza effettuata con successo!**")
                     st.write(
-                        f"Abbiamo trovato la tua prenotazione odierna per **{p_tratt}** alle ore **{p_ora}**."
+                        f"Abbiamo registrato il tuo arrivo per la lezione di **{p_tratt}** delle ore **{p_ora}**."
                     )
-
-                    if p_stato == "Presente":
-                        st.success(
-                            f"✅ Il tuo check-in è già stato registrato per oggi!\n\n**Codice Seduta:** `SEDUTA-OK-{p_id}-{oggi_str}`"
-                        )
-                    else:
-                        if st.button("📍 Conferma Arrivo in Studio"):
-                            conn = sqlite3.connect("prenotazioni.db")
-                            c = conn.cursor()
-                            c.execute(
-                                "UPDATE prenotazioni SET stato_presenza = 'Presente' WHERE id = ?",
-                                (p_id,),
-                            )
-                            conn.commit()
-                            conn.close()
-                            st.success(
-                                f"🎉 Check-in effettuato con successo!\n\nIl tuo codice seduta validato è:\n### `SEDUTA-OK-{p_id}-{oggi_str}`"
-                            )
-                            st.balloons()
+                    st.markdown("---")
+                    st.markdown(f"**Il tuo Codice Seduta:**")
+                    st.markdown(
+                        f"<h3 style='color: #D81B60; text-align: center;'>`SEDUTA-OK-{p_id}-{oggi_str}`</h3>",
+                        unsafe_allow_html=True,
+                    )
             else:
                 st.warning(
                     "⚠️ Nessuna prenotazione attiva trovata per oggi a nome di questo dispositivo. Se hai prenotato con un altro dispositivo o hai problemi, contatta la Dott.ssa Roberta Sinagra."
                 )
 
+            st.markdown("<br>", unsafe_allow_html=True)
             if st.button("🏠 Torna alla Home principale"):
                 st.query_params.clear()
                 st.rerun()
