@@ -136,7 +136,7 @@ def get_orari_per_data(data):
         ]
 
 
-# Identificazione univoca persistente tramite LocalStorage (Legge e preserva i parametri della finestra principale con window.parent)
+# Identificazione univoca sicura con gestione fallback per privacy/incognito
 def get_client_device_id():
     if "dev_id" not in st.query_params or not st.query_params["dev_id"].strip():
         components.html(
@@ -145,13 +145,17 @@ def get_client_device_id():
             <h3 style="color: #880E4F; font-family: sans-serif;">Caricamento studio in corso... 🧘‍♀️</h3>
         </div>
         <script>
-        let devId = localStorage.getItem('pilates_dev_id');
-        if (!devId) {
-            devId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-            localStorage.setItem('pilates_dev_id', devId);
+        let devId;
+        try {
+            devId = localStorage.getItem('pilates_dev_id');
+            if (!devId) {
+                devId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+                localStorage.setItem('pilates_dev_id', devId);
+            }
+        } catch (e) {
+            devId = 'fallback_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
         }
         
-        // Legge i parametri dalla finestra principale del browser (parent)
         const urlParams = new URLSearchParams(window.parent.location.search);
         if (!urlParams.has('dev_id') || urlParams.get('dev_id') !== devId) {
             urlParams.set('dev_id', devId);
