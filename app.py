@@ -99,6 +99,34 @@ def init_db():
 init_db()
 
 
+# Funzione per determinare gli orari in base al giorno della settimana
+def get_orari_per_data(data):
+    if isinstance(data, str):
+        d = datetime.strptime(data, "%Y-%m-%d").date()
+    else:
+        d = data
+    weekday = d.weekday()  # 0=Lun, ..., 5=Sab, 6=Dom
+    if weekday == 5:  # Sabato (08:00 - 13:00)
+        return ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00"]
+    elif weekday == 6:  # Domenica (Chiuso)
+        return []
+    else:  # Lunedì - Venerdì (08:00 - 19:00 no stop)
+        return [
+            "08:00",
+            "09:00",
+            "10:00",
+            "11:00",
+            "12:00",
+            "13:00",
+            "14:00",
+            "15:00",
+            "16:00",
+            "17:00",
+            "18:00",
+            "19:00",
+        ]
+
+
 # Identificazione univoca persistente tramite LocalStorage con schermata di caricamento e anti-cache
 def get_client_device_id():
     if "dev_id" not in st.query_params or not st.query_params["dev_id"].strip():
@@ -218,6 +246,9 @@ if st.session_state["admin_logged_in"]:
             "09:00",
             "10:00",
             "11:00",
+            "12:00",
+            "13:00",
+            "14:00",
             "15:00",
             "16:00",
             "17:00",
@@ -254,7 +285,8 @@ if st.session_state["admin_logged_in"]:
             if btn_blocca:
                 for d_str in lista_date:
                     if modo_intervallo == "Tutta la giornata":
-                        for h in TUTTI_GLI_ORARI_ADMIN:
+                        orari_giorno = get_orari_per_data(d_str)
+                        for h in orari_giorno:
                             c.execute(
                                 "SELECT id FROM prenotazioni WHERE data = ? AND ora = ?",
                                 (d_str, h),
@@ -500,17 +532,7 @@ else:
                 prenotazioni_giorno = c.fetchall()
                 conn.close()
 
-                TUTTI_GLI_ORARI = [
-                    "08:00",
-                    "09:00",
-                    "10:00",
-                    "11:00",
-                    "15:00",
-                    "16:00",
-                    "17:00",
-                    "18:00",
-                    "19:00",
-                ]
+                TUTTI_GLI_ORARI = get_orari_per_data(data_scelta)
 
                 try:
                     local_tz = ZoneInfo("Europe/Rome")
@@ -564,7 +586,7 @@ else:
                     else:
                         st.selectbox(
                             "Seleziona Ora *",
-                            ["Tutto occupato"],
+                            ["Tutto occupato / Chiuso"],
                             disabled=True,
                             key="dis_ora_occupato",
                         )
@@ -589,10 +611,10 @@ else:
                     )
                 elif not nome.strip():
                     st.error("Per favore inserisci il tuo nome e cognome.")
-                elif not ora_scelta or ora_scelta == "Tutto occupato":
+                elif not ora_scelta or "Tutto occupato" in ora_scelta:
                     st.error(
-                        "Spiacenti, tutti gli orari per questa data sono già occupati o"
-                        " passati."
+                        "Spiacenti, non ci sono orari disponibili o lo studio è"
+                        " chiuso per la data selezionata."
                     )
                 else:
                     conn = sqlite3.connect("prenotazioni.db")
@@ -663,7 +685,7 @@ else:
                 "Benvenuti nello studio della **Dott.ssa Roberta Sinagra**,"
                 " specializzato in Posturologia e Pilates."
             )
-            
+
             st.markdown("---")
             st.markdown("#### 💳 Tipologie di Abbonamenti e Tariffe")
             st.markdown("""
@@ -672,7 +694,7 @@ else:
                 * 🏷️ **Carnet 10 Lezioni:** 10 lezioni spendibili nell'arco dei 3 mesi
                 * 🏷️ **Lezione Singola:** Ingresso singolo
                 """)
-            
+
             st.markdown("---")
             st.markdown("#### 📱 Installa la Web App sul tuo Smartphone")
             st.markdown("""
@@ -700,5 +722,5 @@ else:
                 * 🧦 **Abbigliamento e Calzini:** È obbligatorio l'uso di **calzini antiscivolo** durante tutte le lezioni.
                 * 🧴 **Asciugamano:** Si richiede di portare un proprio asciugamano personale.
                 * 📵 **Cellulari:** Modalità silenziosa consigliata.
-                * ⏱️ **Disdette:** Preavviso minimo di 24 ore, in caso contrario la lezione verrà comunque conteggiata.
+                * ⏱️ **Disdette:** Preavviso minimo di 24 ore.
                 """)
