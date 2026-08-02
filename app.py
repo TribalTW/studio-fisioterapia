@@ -15,7 +15,7 @@ st.set_page_config(
     layout="centered",
 )
 
-# Stile CSS della pagina
+# Stile CSS della pagina (inclusi i pulsanti di download ingranditi)
 st.markdown(
     """
     <style>
@@ -36,19 +36,19 @@ st.markdown(
         border: 1px solid #E0E0E0 !important;
     }
     
-    div.stButton > button {
+    div.stButton > button, div.stDownloadButton > button {
         background-color: #D81B60 !important;
         color: white !important;
-        border-radius: 10px !important;
-        font-size: 1rem !important;
+        border-radius: 12px !important;
+        font-size: 1.1rem !important;
         font-weight: bold !important;
         border: none !important;
         width: 100% !important;
-        padding: 10px 20px !important;
+        padding: 12px 20px !important;
         margin-top: 5px !important;
     }
     
-    div.stButton > button:hover {
+    div.stButton > button:hover, div.stDownloadButton > button:hover {
         background-color: #C2185B !important;
     }
     
@@ -190,27 +190,29 @@ def get_current_time_local():
         return datetime.now()
 
 
-# Funzione per generare il contenuto del file di calendario ICS
+# Funzione per generare il file ICS con titolo personalizzato (evita "evento personale")
 def genera_file_ics(nome_trattamento, data_str, ora_str):
-    # Formato dataora inizio e fine (durata lezione stimata 50 min)
     dt_inizio = datetime.strptime(f"{data_str} {ora_str}", "%Y-%m-%d %H:%M")
     dt_fine = dt_inizio + timedelta(minutes=50)
     
     fmt = "%Y%m%dT%H%M00"
+    titolo_evento = f"Pilates: {nome_trattamento} - Dott.ssa Roberta Sinagra"
     
     ics_content = f"""BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//Postura e Pilates//Dott.ssa Roberta Sinagra//IT
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
 BEGIN:VEVENT
-SUMMARY:Lezione: {nome_trattamento}
-DESCRIPTION:Appuntamento di Postura & Pilates con la Dott.ssa Roberta Sinagra. Ricorda di portare i calzini antiscivolo e un asciugamano.
+SUMMARY:{titolo_evento}
+DESCRIPTION:Appuntamento di Postura & Pilates con la Dott.ssa Roberta Sinagra.\\nRicorda di portare i calzini antiscivolo e un asciugamano personale.
 LOCATION:Studio Dott.ssa Roberta Sinagra
 DTSTART:{dt_inizio.strftime(fmt)}
 DTEND:{dt_fine.strftime(fmt)}
 BEGIN:VALARM
 TRIGGER:-PT60M
 ACTION:DISPLAY
-DESCRIPTION:Promemoria: Lezione tra 1 ora
+DESCRIPTION:Promemoria: Tra 1 ora hai la lezione di Pilates in studio!
 END:VALARM
 END:VEVENT
 END:VCALENDAR"""
@@ -798,14 +800,30 @@ else:
                 
                 if "ics_data" in st.session_state:
                     st.markdown("---")
-                    st.markdown("#### 📱 Sincronizza con il tuo calendario")
-                    st.write("Tocca il pulsante qui sotto per aggiungere subito l'appuntamento al calendario del tuo smartphone (Apple Calendar, Google Calendar, ecc.) con promemoria automatico:")
-                    st.download_button(
-                        label="📅 Aggiungi al Calendario (Crea Promemoria)",
-                        data=st.session_state["ics_data"],
-                        file_name="appuntamento_pilates.ics",
-                        mime="text/calendar",
+                    # Sezione visiva accattivante ed esplicita per il calendario dello smartphone
+                    st.markdown(
+                        """
+                        <div style="background-color: #fff0f5; padding: 22px; border-radius: 14px; border: 2px solid #D81B60; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                            <h3 style="color: #880E4F; margin-top: 0; font-size: 1.35rem;">📲 NON PERDERE L'APPUNTAMENTO!</h3>
+                            <p style="font-size: 1.05rem; color: #333; margin-bottom: 0; line-height: 1.5;">
+                                Aggiungi subito la lezione <b>al calendario del tuo smartphone</b> (Apple o Google Calendar). 
+                                Il telefono ti invierà un comodo <b>promemoria automatico</b> prima di venire in studio!
+                            </p>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
                     )
+                    
+                    # Pulsante di download centrato e ingrandito tramite colonne
+                    c_left, c_center, c_right = st.columns([1, 4, 1])
+                    with c_center:
+                        st.download_button(
+                            label="📅 AGGIUNGI SUBITO AL MIO CALENDARIO 📲",
+                            data=st.session_state["ics_data"],
+                            file_name="appuntamento_pilates.ics",
+                            mime="text/calendar",
+                            use_container_width=True
+                        )
                     st.markdown("---")
 
                 if st.button("Effettua una nuova prenotazione"):
