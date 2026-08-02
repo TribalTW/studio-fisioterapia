@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, time, timedelta
 import os
 import sqlite3
 import uuid
@@ -641,7 +641,7 @@ else:
             " violazione delle regole del servizio."
         )
     else:
-        # GESTIONE CHECK-IN AUTOMATICO TRAMITE QR CODE SCAN (SELEZIONE NOME/ORARIO)
+        # GESTIONE CHECK-IN AUTOMATICO TRAMITE QR CODE SCAN (VERIFICA NOME E ORARIO)
         if st.query_params.get("action") == "checkin":
             if logo_path:
                 c1, c2, c3 = st.columns([1, 2, 1])
@@ -651,14 +651,13 @@ else:
             st.title("📍 Check-in Ingresso Studio")
             oggi_str = datetime.today().strftime("%Y-%m-%d")
 
-            conn = sqlite3.connect("prenotazioni.db")
-            c = conn.cursor()
-            c.execute(
-                "SELECT id, nome, trattamento, ora, stato_presenza FROM prenotazioni WHERE data = ? AND device_id != 'SYSTEM' ORDER BY ora ASC",
-                (oggi_str,),
-            )
-            appuntamenti_oggi = c.fetchall()
-            conn.close()
+            try:
+                local_tz = ZoneInfo("Europe/Rome")
+                current_dt = datetime.now(local_tz)
+            except Exception:
+                current_dt = datetime.now()
+
+            current_time = current_dt.time()
 
             if "checkin_successo" in st.session_state:
                 p_id, p_nome, p_tratt, p_ora, oggi_str = st.session_state[
@@ -677,52 +676,106 @@ else:
                         f"<h3 style='color: #D81B60; text-align: center;'>`SEDUTA-OK-{p_id}-{oggi_str}`</h3>",
                         unsafe_allow_html=True,
                     )
-            elif appuntamenti_oggi:
+            else:
                 with st.container(border=True):
                     st.markdown(
-                        "**Benvenuto/a in studio! 🧘‍♀️ Seleziona il tuo appuntamento per confermare l'arrivo:**"
+                        "**Benvenuto/a in studio! 🧘‍♀️ Inserisci i tuoi dati per confermare l'arrivo:**"
                     )
-                    with st.form("form_checkin_cliente"):
-                        scelte = [
-                            f"{ora} - {nome} ({trattamento})"
-                            for p_id, nome, trattamento, ora, stato in appuntamenti_oggi
-                        ]
-                        scelta_utente = st.selectbox(
-                            "Il tuo appuntamento",
-                            scelte,
-                            key="scelta_checkin_cliente",
+                    with st.form("form_checkin_cliente_sicuro"):
+                        nome_inserito = st.text_input(
+                            "Inserisci il tuo Nome e Cognome esatto *"
                         )
                         submit_checkin = st.form_submit_button(
                             "✅ Conferma la mia Presenza"
                         )
 
                         if submit_checkin:
-                            idx = scelte.index(scelta_utente)
-                            p_id, p_nome, p_tratt, p_ora, p_stato = (
-                                appuntamenti_oggi[idx]
-                            )
+                            if not nome_inserito.strip():
+                                st.error(
+                                    "Per favore, inserisci il tuo nome e cognome."
+                                )
+                            else:
+                                # Cerchiamo nel database gli appuntamenti di oggi per questo nome (case-insensitive)
+                                conn = sqlite3.connect("prenotazioni.db")
+                                c = conn.cursor()
+                                c.execute(
+                                    "SELECT id, nome, trattamento, ora, stato_presenza FROM prenotazioni WHERE data = ? AND device_id != 'SYSTEM' AND LOWER(nome) LIKE ?",
+                                    (
+                                        oggi_str,
+                                        f"%{nome_inserito.strip().lower()}%",
+                                    ),
+                                )
+                                appuntamenti_trovati = c.fetchall()
+                                conn.close()
 
-                            conn = sqlite3.connect("prenotazioni.db")
-                            c = conn.cursor()
-                            c.execute(
-                                "UPDATE prenotazioni SET stato_presenza = 'Presente' WHERE id = ?",
-                                (p_id,),
-                            )
-                            conn.commit()
-                            conn.close()
+                                if not appuntamenti_trovati:
+                                    st.error(
+                                        f"❌ Nessuna prenotazione trovata oggi a nome di '{nome_inserito}'. Verifica di aver scritto correttamente il nome con cui hai prenotato."
+                                    )
+                                else:
+                                    # Filtriamo gli appuntamenti in base alla fascia oraria valida (consentiamo il check-in da 45 minuti prima fino a 30 minuti dopo l'orario prenotato)
+                                    appuntamento_valido = None
+                                    for (
+                                        p_id,
+                                        p_nome,
+                                        p_tratt,
+                                        p_ora,
+                                        p_stato,
+                                    ) in appuntamenti_trovati:
+                                        ora_app = datetime.strptime(
+                                            p_ora, "%H:%M"
+                                        ).time()
+                                        dt_app = datetime.combine(
+                                            datetime.today(), ora_app
+                                        )
 
-                            st.session_state["checkin_successo"] = (
-                                p_id,
-                                p_nome,
-                                p_tratt,
-                                p_ora,
-                                oggi_str,
-                            )
-                            st.rerun()
-            else:
-                st.warning(
-                    "⚠️ Nessuna prenotazione registrata nel sistema per la giornata odierna."
-                )
+                                        # Finestra temporale: da 45 min prima a 30 min dopo
+                                        inizio_finestra = (
+                                            dt_app - timedelta(minutes=45)
+                                        ).time()
+                                        fine_finestra = (
+                                            dt_app + timedelta(minutes=30)
+                                        ).time()
+
+                                        if (
+                                            inizio_finestra
+                                            <= current_time
+                                            <= fine_finestra
+                                        ):
+                                            appuntamento_valido = (
+                                                p_id,
+                                                p_nome,
+                                                p_tratt,
+                                                p_ora,
+                                            )
+                                            break
+
+                                    if appuntamento_valido:
+                                        p_id, p_nome, p_tratt, p_ora = (
+                                            appuntamento_valido
+                                        )
+
+                                        conn = sqlite3.connect("prenotazioni.db")
+                                        c = conn.cursor()
+                                        c.execute(
+                                            "UPDATE prenotazioni SET stato_presenza = 'Presente' WHERE id = ?",
+                                            (p_id,),
+                                        )
+                                        conn.commit()
+                                        conn.close()
+
+                                        st.session_state["checkin_successo"] = (
+                                            p_id,
+                                            p_nome,
+                                            p_tratt,
+                                            p_ora,
+                                            oggi_str,
+                                        )
+                                        st.rerun()
+                                    else:
+                                        st.error(
+                                            "⏳ Il check-in è consentito solo nell'orario prossimo al tuo appuntamento (da 45 minuti prima fino a 30 minuti dopo l'orario stabilito)."
+                                        )
 
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("🏠 Torna alla Home principale"):
