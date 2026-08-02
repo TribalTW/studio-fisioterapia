@@ -706,11 +706,15 @@ else:
         # TAB 3: DOVE SIAMO
         with tab3:
             st.markdown("### 📍 Dove Siamo & Contatti")
-            st.write("📍 **Indirizzo:** Via Antonino di San Giuliano 55, Sant’Agata li Battiati")
+            st.write("📍 **Indirizzo:** Inserisci qui l'indirizzo dello studio")
             st.markdown(
                 "📞 **Telefono / WhatsApp:** [+39 379"
                 " 2073118](tel:+393792073118) o [Scrivici su"
                 " WhatsApp](https://wa.me/393792073118)"
+            )
+            st.markdown(
+                "📧 **Email:**"
+                " [posturaepilates@outlook.it](mailto:posturaepilates@outlook.it)"
             )
 
         # TAB 4: REGOLAMENTO
