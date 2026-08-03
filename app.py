@@ -397,7 +397,7 @@ if logo_path:
 
 st.sidebar.title("🔐 Area Riservata (Admin)")
 
-ADMIN_PASSWORD = "MiaPassword2026!"
+ADMIN_PASSWORD = st.secrets.get("admin_password", "PasswordDiFallbackSeNonImpostata")
 
 if "admin_logged_in" not in st.session_state:
     st.session_state["admin_logged_in"] = False
