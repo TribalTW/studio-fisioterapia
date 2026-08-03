@@ -15,9 +15,8 @@ from sqlalchemy import create_engine, text
 st.set_page_config(
     page_title="Postura & Pilates - Dott.ssa Roberta Sinagra",
     page_icon="🧘‍♀️",
-    layout="wide",
+    layout="centered",
 )
-st.sidebar.image("percorso_al_tuo_logo.png", width=180)
 
 # Connessione a Supabase / PostgreSQL con caching delle risorse
 @st.cache_resource
@@ -77,8 +76,9 @@ def init_db():
 
 init_db()
 
-# Stile CSS della pagina
-st.markdown("""
+# Stile CSS della pagina (Palette Rosa Pastello Sofisticato e Professionale)
+st.markdown(
+    """
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap');
 
@@ -96,36 +96,83 @@ st.markdown("""
         border-right: 1px solid #F2E1E6;
     }
 
-    .stButton>button {
-        background-color: #C27885;
-        color: white;
-        border-radius: 8px;
-        border: none;
-        padding: 0.5rem 1rem;
-        font-weight: 500;
-        box-shadow: 0 4px 12px rgba(194, 120, 133, 0.2);
+    div.stVerticalBlockBorderWrapper, div[data-testid="stVerticalBlockBorderWrapper"] {
+        background-color: #FFFFFF !important;
+        border: 1px solid #EED5DC !important;
+        border-radius: 16px !important;
+        padding: 20px !important;
+        box-shadow: 0 4px 20px rgba(194, 120, 133, 0.06) !important;
+    }
+    
+    div[data-testid="stVerticalBlockBorderWrapper"] div {
+        background-color: transparent !important;
+    }
+    
+    .stTextInput input, .stSelectbox > div > div, .stDateInput input, .stNumberInput input {
+        background-color: #FFFFFF !important;
+        border-radius: 8px !important;
+        border: 1px solid #E6D0D6 !important;
+    }
+
+    .stTextInput input:focus, div[data-baseweb="select"] > div:hover {
+        border-color: #C27885 !important;
+    }
+    
+    div.stButton > button, div.stDownloadButton > button {
+        background-color: #C27885 !important;
+        color: white !important;
+        border-radius: 12px !important;
+        font-size: 1.05rem !important;
+        font-weight: 600 !important;
+        border: none !important;
+        width: 100% !important;
+        padding: 12px 20px !important;
+        margin-top: 5px !important;
+        text-align: center !important;
+        display: block !important;
+        box-shadow: 0 4px 12px rgba(194, 120, 133, 0.2) !important;
         transition: all 0.3s ease;
     }
-
-    .stButton>button:hover {
-        background-color: #B26573;
-        box-shadow: 0 6px 16px rgba(194, 120, 133, 0.3);
-        color: white;
+    
+    div.stButton > button:hover, div.stDownloadButton > button:hover {
+        background-color: #B26573 !important;
+        color: white !important;
+        box-shadow: 0 6px 16px rgba(194, 120, 133, 0.3) !important;
     }
-
-    div[data-baseweb="select"] > div, .stTextInput input {
-        border-radius: 8px;
-        border-color: #E6D0D6;
+    
+    div[data-testid="stColumn"] div.stButton > button.btn-aggiorna {
+        padding: 6px 15px !important;
+        font-size: 0.9rem !important;
+        width: auto !important;
+        white-space: nowrap !important;
     }
-
-    div[data-baseweb="select"] > div:hover, .stTextInput input:focus {
-        border-color: #C27885;
+    
+    h1, h2, h3, h4 {
+        color: #8A4F5C !important;
+        text-align: center;
     }
-
+    
+    .box-info-carino {
+        background-color: #FFF5F7 !important;
+        border: 1px solid #EED5DC !important;
+        border-radius: 12px !important;
+        padding: 14px 18px !important;
+        margin-bottom: 18px !important;
+        text-align: center !important;
+        color: #8A4F5C !important;
+        font-size: 0.95rem !important;
+    }
+    
+    .stCaption, p {
+        text-align: center;
+    }
+    
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 
 # Funzioni di supporto per la verifica del Codice Fiscale
@@ -468,7 +515,7 @@ if st.session_state["admin_logged_in"]:
                         if is_presente:
                             codice_seduta = f"SEDUTA-OK-{app_id}-{data_presenze_str}"
                             st.markdown(
-                                f"<code style='color: #D81B60; font-weight: bold;'>{codice_seduta}</code>",
+                                f"<code style='color: #C27885; font-weight: bold;'>{codice_seduta}</code>",
                                 unsafe_allow_html=True,
                             )
                         else:
@@ -525,8 +572,8 @@ if st.session_state["admin_logged_in"]:
 
         components.html(
             """
-        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; background: #ffffff; padding: 20px; border-radius: 12px; border: 2px dashed #D81B60;">
-            <h4 style="color: #880E4F; margin-bottom: 10px;">Inquadra per Check-in Studio 🧘‍♀️</h4>
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; background: #ffffff; padding: 20px; border-radius: 12px; border: 2px dashed #C27885;">
+            <h4 style="color: #8A4F5C; margin-bottom: 10px;">Inquadra per Check-in Studio 🧘‍♀️</h4>
             <div id="qrcode" style="margin: 15px;"></div>
             <p style="font-size: 12px; color: #555; text-align: center;">Inquadra con la fotocamera dello smartphone all'arrivo in studio.</p>
         </div>
@@ -827,7 +874,7 @@ else:
                     st.markdown("---")
                     st.markdown(f"**Il tuo Codice Seduta:**")
                     st.markdown(
-                        f"<h3 style='color: #D81B60; text-align: center;'>`SEDUTA-OK-{p_id}-{oggi_str}`</h3>",
+                        f"<h3 style='color: #C27885; text-align: center;'>`SEDUTA-OK-{p_id}-{oggi_str}`</h3>",
                         unsafe_allow_html=True,
                     )
             else:
@@ -1006,7 +1053,7 @@ else:
 
             st.stop()
 
-        # --- GATE DI ACCESSO: Login / Registrazione / Recupero Password ---
+        # --- GATE DI ACCESSO: Login / Registrazione Account Cliente ---
         if "utente_loggato" not in st.session_state:
             if logo_path:
                 c1, c2, c3 = st.columns([1, 2, 1])
@@ -1015,17 +1062,18 @@ else:
 
             st.title("Postura & Pilates")
             st.write("**Dott.ssa Roberta Sinagra**")
-            st.markdown("#### 👤 Area Utenti")
+            st.markdown("#### 👤 Accedi al tuo account o registrati")
             st.markdown(
                 """
                 <div class="box-info-carino">
-                    ✨ Accedi al tuo account, registrati o recupera la password in caso di smarrimento.
+                    ✨ Crea un account una sola volta: alle prossime visite ti basterà accedere
+                    con nome, cognome e password, senza dover reinserire il Codice Fiscale ogni volta.
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
 
-            tab_login, tab_registrazione, tab_recupero = st.tabs(["🔑 Accedi", "📝 Registrati", "🔄 Recupera Password"])
+            tab_login, tab_registrazione = st.tabs(["🔑 Accedi", "📝 Registrati"])
 
             with tab_login:
                 with st.form("form_login_utente"):
@@ -1070,61 +1118,6 @@ else:
                                 st.success(msg)
                             else:
                                 st.error(f"❌ {msg}")
-
-            with tab_recupero:
-                st.markdown("##### 🔄 Reimposta la tua password")
-                st.write("Inserisci i tuoi dati anagrafici e il tuo Codice Fiscale per procedere al cambio password.")
-
-                if "reset_cf_ok" not in st.session_state:
-                    with st.form("form_verifica_recupero"):
-                        rec_nome = st.text_input("Nome *", key="rec_nome_input")
-                        rec_cognome = st.text_input("Cognome *", key="rec_cognome_input")
-                        rec_cf = st.text_input("Codice Fiscale *", key="rec_cf_input")
-                        submit_verifica = st.form_submit_button("Verifica Dati")
-
-                        if submit_verifica:
-                            n_clean = rec_nome.strip().upper()
-                            c_clean = rec_cognome.strip().upper()
-                            cf_clean = rec_cf.strip().upper()
-
-                            if not n_clean or not c_clean or not cf_clean:
-                                st.error("Per favore, compila tutti i campi.")
-                            else:
-                                with engine.begin() as conn:
-                                    res = conn.execute(
-                                        text("SELECT id FROM utenti WHERE UPPER(nome) = :n AND UPPER(cognome) = :c AND UPPER(codice_fiscale) = :cf"),
-                                        {"n": n_clean, "c": c_clean, "cf": cf_clean}
-                                    ).fetchone()
-                                if res:
-                                    st.session_state["reset_cf_ok"] = cf_clean
-                                    st.success("✅ Dati verificati con successo! Inserisci la nuova password qui sotto.")
-                                    st.rerun()
-                                else:
-                                    st.error("❌ Nessun account trovato con questi dati. Verifica che Nome, Cognome e Codice Fiscale siano corretti.")
-                else:
-                    cf_da_aggiornare = st.session_state["reset_cf_ok"]
-                    st.info(f"Stai reimpostando la password per il Codice Fiscale: **{cf_da_aggiornare}**")
-
-                    with st.form("form_nuova_password"):
-                        nuova_p1 = st.text_input("Nuova Password *", type="password", key="nuova_p1_input")
-                        nuova_p2 = st.text_input("Conferma Nuova Password *", type="password", key="nuova_p2_input")
-                        submit_nuova_pwd = st.form_submit_button("Aggiorna Password")
-
-                        if submit_nuova_pwd:
-                            if not nuova_p1 or not nuova_p2:
-                                st.error("Inserisci e conferma la nuova password.")
-                            elif nuova_p1 != nuova_p2:
-                                st.error("Le password inserite non coincidono.")
-                            else:
-                                salt, pwd_hash = hash_password(nuova_p1)
-                                with engine.begin() as conn:
-                                    conn.execute(
-                                        text("UPDATE utenti SET password_salt = :salt, password_hash = :pwd_hash WHERE codice_fiscale = :cf"),
-                                        {"salt": salt, "pwd_hash": pwd_hash, "cf": cf_da_aggiornare}
-                                    )
-                                del st.session_state["reset_cf_ok"]
-                                st.success("🎉 Password aggiornata con successo! Ora puoi effettuare il login con la nuova password.")
-                                st.balloons()
 
             st.stop()
 
@@ -1207,8 +1200,8 @@ else:
                     st.markdown("---")
                     st.markdown(
                         """
-                        <div style="background-color: #fff0f5; padding: 22px; border-radius: 14px; border: 2px solid #D81B60; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-                            <h3 style="color: #880E4F; margin-top: 0; font-size: 1.35rem;">📲 SALVA L'APPUNTAMENTO NEL TUO CALENDARIO</h3>
+                        <div style="background-color: #FFF5F7; padding: 22px; border-radius: 14px; border: 2px solid #C27885; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                            <h3 style="color: #8A4F5C; margin-top: 0; font-size: 1.35rem;">📲 SALVA L'APPUNTAMENTO NEL TUO CALENDARIO</h3>
                             <p style="font-size: 1.05rem; color: #333; margin-bottom: 15px; line-height: 1.5;">
                                 Clicca sul pulsante qui sotto per scaricare il file dell'evento. Bastano pochissimi secondi per salvarlo sul tuo telefono o computer!
                             </p>
