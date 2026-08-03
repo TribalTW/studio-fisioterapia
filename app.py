@@ -15,7 +15,7 @@ from sqlalchemy import create_engine, text
 st.set_page_config(
     page_title="Postura & Pilates - Dott.ssa Roberta Sinagra",
     page_icon="🧘‍♀️",
-    layout="centered",
+    layout="wide",
 )
 
 # Connessione a Supabase / PostgreSQL con caching delle risorse
