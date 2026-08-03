@@ -119,7 +119,7 @@ st.markdown(
         box-shadow: 0 0 0 3px rgba(216, 27, 96, 0.15) !important;
     }
     
-    /* Pulsanti professionali con effetti di transizione e ombreggiatura (Accedi e Cambia password) */
+    /* Pulsanti professionali con effetti di transizione e ombreggiatura */
     div.stButton > button, div.stDownloadButton > button {
         background: linear-gradient(135deg, #D81B60 0%, #AD1457 100%) !important;
         color: white !important;
@@ -147,34 +147,6 @@ st.markdown(
     div.stButton > button:active {
         transform: translateY(0px);
         box-shadow: 0 2px 10px rgba(216, 27, 96, 0.3) !important;
-    }
-
-    /* Allineamento ed estetica personalizzata per i pulsanti Recupera password e Annulla nell'angolo in basso a destra */
-    div.stForm div[data-testid="stHorizontalBlock"] {
-        align-items: center;
-    }
-    div.stForm div[data-testid="stColumn"]:nth-child(2) {
-        display: flex;
-        justify-content: flex-end;
-    }
-    div.stForm div[data-testid="stColumn"]:nth-child(2) div.stButton > button {
-        background: transparent !important;
-        color: #D81B60 !important;
-        border: 1.5px solid #f2c2d5 !important;
-        border-radius: 12px !important;
-        font-size: 0.95rem !important;
-        font-weight: 600 !important;
-        width: auto !important;
-        padding: 12px 20px !important;
-        box-shadow: none !important;
-        transition: all 0.2s ease-in-out !important;
-    }
-    div.stForm div[data-testid="stColumn"]:nth-child(2) div.stButton > button:hover {
-        background: #fff0f5 !important;
-        border-color: #D81B60 !important;
-        color: #880E4F !important;
-        transform: translateY(-1px);
-        box-shadow: 0 4px 10px rgba(216, 27, 96, 0.15) !important;
     }
     
     div[data-testid="stColumn"] div.stButton > button.btn-aggiorna {
@@ -1220,7 +1192,7 @@ else:
                         rec_nuova_password = st.text_input("Nuova Password *", type="password", key="rec_nuova_password_input")
                         rec_nuova_password_conferma = st.text_input("Conferma Nuova Password *", type="password", key="rec_nuova_password_conferma_input")
                         
-                        col_r1, col_r2 = st.columns([1.2, 0.8])
+                        col_r1, col_r2 = st.columns(2)
                         with col_r1:
                             submit_cambia_pwd = st.form_submit_button("Cambia password")
                         with col_r2:
@@ -1248,7 +1220,7 @@ else:
                             "Password *", type="password", key="login_password_input"
                         )
                         
-                        col_btn_1, col_btn_2 = st.columns([1.2, 0.8])
+                        col_btn_1, col_btn_2 = st.columns(2)
                         with col_btn_1:
                             submit_login = st.form_submit_button("Accedi")
                         with col_btn_2:
