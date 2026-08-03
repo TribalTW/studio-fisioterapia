@@ -77,78 +77,54 @@ def init_db():
 init_db()
 
 # Stile CSS della pagina
-st.markdown(
-    """
+st.markdown("""
     <style>
-    div.stVerticalBlockBorderWrapper, div[data-testid="stVerticalBlockBorderWrapper"] {
-        background-color: #fca4c3 !important;
-        border: 1px solid #e882a4 !important;
-        border-radius: 16px !important;
-        padding: 20px !important;
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap');
+
+    html, body, [class*="css"] {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        color: #2C2C2C;
     }
-    
-    div[data-testid="stVerticalBlockBorderWrapper"] div {
-        background-color: transparent !important;
+
+    .stApp {
+        background-color: #FAFAFA;
     }
-    
-    .stTextInput input, .stSelectbox > div > div, .stDateInput input, .stNumberInput input {
-        background-color: #FFFFFF !important;
-        border-radius: 8px !important;
-        border: 1px solid #E0E0E0 !important;
+
+    [data-testid="stSidebar"] {
+        background-color: #FFF5F7;
+        border-right: 1px solid #F2E1E6;
     }
-    
-    div.stButton > button, div.stDownloadButton > button {
-        background-color: #D81B60 !important;
-        color: white !important;
-        border-radius: 12px !important;
-        font-size: 1.1rem !important;
-        font-weight: bold !important;
-        border: none !important;
-        width: 100% !important;
-        padding: 12px 20px !important;
-        margin-top: 5px !important;
-        text-align: center !important;
-        display: block !important;
+
+    .stButton>button {
+        background-color: #C27885;
+        color: white;
+        border-radius: 8px;
+        border: none;
+        padding: 0.5rem 1rem;
+        font-weight: 500;
+        box-shadow: 0 4px 12px rgba(194, 120, 133, 0.2);
+        transition: all 0.3s ease;
     }
-    
-    div.stButton > button:hover, div.stDownloadButton > button:hover {
-        background-color: #C2185B !important;
-        color: white !important;
+
+    .stButton>button:hover {
+        background-color: #B26573;
+        box-shadow: 0 6px 16px rgba(194, 120, 133, 0.3);
+        color: white;
     }
-    
-    div[data-testid="stColumn"] div.stButton > button.btn-aggiorna {
-        padding: 6px 15px !important;
-        font-size: 0.9rem !important;
-        width: auto !important;
-        white-space: nowrap !important;
+
+    div[data-baseweb="select"] > div, .stTextInput input {
+        border-radius: 8px;
+        border-color: #E6D0D6;
     }
-    
-    h1, h2, h3, h4 {
-        color: #880E4F !important;
-        text-align: center;
+
+    div[data-baseweb="select"] > div:hover, .stTextInput input:focus {
+        border-color: #C27885;
     }
-    
-    .box-info-carino {
-        background-color: #fff5f8 !important;
-        border: 1px solid #f3b6cc !important;
-        border-radius: 12px !important;
-        padding: 14px 18px !important;
-        margin-bottom: 18px !important;
-        text-align: center !important;
-        color: #880E4F !important;
-        font-size: 0.95rem !important;
-    }
-    
-    .stCaption, p {
-        text-align: center;
-    }
-    
+
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     </style>
-""",
-    unsafe_allow_html=True,
-)
+""", unsafe_allow_html=True)
 
 
 # Funzioni di supporto per la verifica del Codice Fiscale
