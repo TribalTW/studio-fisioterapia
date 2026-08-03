@@ -178,7 +178,7 @@ st.markdown(
     }
     
     /* Stile delle Tab di navigazione - Uniforme e a capsula */
-    /* Sblocca i contenitori per evitare qualsiasi taglio superiore o laterale */
+    /* Sblocca i contenitori per evitare qualsiasi taglio superiore o lateral */
     .stTabs, .stTabs [data-baseweb="tab-list"], .stTabs div {
         overflow: visible !important;
     }
@@ -188,15 +188,16 @@ st.markdown(
         display: none !important;
     }
 
-    /* Stile base delle tab non selezionate */
+    /* Stile base delle tab non selezionate con più spazio interno */
     .stTabs [data-baseweb="tab"] {
         background-color: #fff0f5;
-        border-radius: 30px !important;
+        border-radius: 40px !important;
         color: #880E4F;
         font-weight: 600;
-        padding: 10px 24px !important;
+        padding: 14px 32px !important; /* Spazio maggiore attorno al testo */
+        font-size: 16px !important;     /* Testo leggermente più leggibile */
         border: 1.5px solid #fca4c3 !important;
-        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important; /* Effetto elastico e morbido */
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
     }
 
     .stTabs [data-baseweb="tab"]:hover {
@@ -204,15 +205,15 @@ st.markdown(
         transform: translateY(-2px);
     }
 
-    /* Tab selezionata in primo piano con animazione fluttuante */
+    /* Tab selezionata in primo piano, più grande e spaziosa */
     .stTabs [aria-selected="true"] {
         background: linear-gradient(135deg, #fca4c3 0%, #e882a4) !important;
         color: #ffffff !important;
         border-color: #e882a4 !important;
-        border-radius: 30px !important;
+        border-radius: 40px !important;
         box-shadow: 0 12px 30px rgba(232, 130, 164, 0.55) !important;
-        transform: translateY(-5px) scale(1.04) !important; /* Si solleva e si ingrandisce leggermente in primo piano */
-        z-index: 999 !important; /* Porta la tab sopra a tutte le altre */
+        transform: translateY(-5px) scale(1.04) !important;
+        z-index: 999 !important;
     }
 
     .stCaption, p {
