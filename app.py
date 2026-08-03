@@ -178,42 +178,41 @@ st.markdown(
     }
     
     /* Stile delle Tab di navigazione - Uniforme e a capsula */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 12px;
-        justify-content: center;
-        border-bottom: none !important;
+    /* Sblocca i contenitori per evitare qualsiasi taglio superiore o laterale */
+    .stTabs, .stTabs [data-baseweb="tab-list"], .stTabs div {
         overflow: visible !important;
     }
 
-    /* Nasconde la barra/linea nativa di Streamlit sotto le tab */
+    /* Nasconde la linea standard di Streamlit */
     .stTabs [data-baseweb="tab-highlight"] {
         display: none !important;
     }
 
+    /* Stile base delle tab non selezionate */
     .stTabs [data-baseweb="tab"] {
         background-color: #fff0f5;
-        border-radius: 50px !important; /* Forma a pillola / capsula perfetta */
+        border-radius: 30px !important;
         color: #880E4F;
         font-weight: 600;
-        padding: 8px 22px !important;
-        height: auto !important;
+        padding: 10px 24px !important;
         border: 1.5px solid #fca4c3 !important;
-        transition: all 0.3s ease !important;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important; /* Effetto elastico e morbido */
     }
 
     .stTabs [data-baseweb="tab"]:hover {
         background-color: #ffe4ec;
-        transform: translateY(-1px);
+        transform: translateY(-2px);
     }
 
+    /* Tab selezionata in primo piano con animazione fluttuante */
     .stTabs [aria-selected="true"] {
         background: linear-gradient(135deg, #fca4c3 0%, #e882a4) !important;
         color: #ffffff !important;
         border-color: #e882a4 !important;
-        border-radius: 50px !important; /* Conferma la forma arrotondata anche da attivo */
-        box-shadow: 0 6px 18px rgba(252, 164, 195, 0.45) !important;
-        transform: translateY(-2px) !important;
-        z-index: 10;
+        border-radius: 30px !important;
+        box-shadow: 0 12px 30px rgba(232, 130, 164, 0.55) !important;
+        transform: translateY(-5px) scale(1.04) !important; /* Si solleva e si ingrandisce leggermente in primo piano */
+        z-index: 999 !important; /* Porta la tab sopra a tutte le altre */
     }
 
     .stCaption, p {
@@ -221,7 +220,7 @@ st.markdown(
     }
 
     #MainMenu {visibility: hidden;}
-    <footer>visibility: hidden;</footer>
+    footer {visibility: hidden;}
     </style>
 """,
     unsafe_allow_html=True,
