@@ -148,6 +148,21 @@ st.markdown(
         transform: translateY(0px);
         box-shadow: 0 2px 10px rgba(216, 27, 96, 0.3) !important;
     }
+
+    /* Stile specifico per il pulsante secondario (Password dimenticata?) nella seconda colonna del form di login */
+    div[data-testid="stColumn"]:nth-child(2) div.stFormSubmitButton > button {
+        background: #fff0f5 !important;
+        color: #880E4F !important;
+        border: 1.5px solid #fca4c3 !important;
+        box-shadow: 0 4px 15px rgba(252, 164, 195, 0.15) !important;
+    }
+
+    div[data-testid="stColumn"]:nth-child(2) div.stFormSubmitButton > button:hover {
+        background: #ffe4ec !important;
+        color: #880E4F !important;
+        box-shadow: 0 6px 20px rgba(252, 164, 195, 0.3) !important;
+        transform: translateY(-2px);
+    }
     
     div[data-testid="stColumn"] div.stButton > button.btn-aggiorna {
         padding: 8px 16px !important;
@@ -312,7 +327,7 @@ def valida_codice_fiscale(nome, cognome, cf):
     return True, ""
 
 
-# --- Funzioni di supporto per Account Utenti (Registrazione/Login) ---
+# --- Funzioni di supporto per Account Utenti (Registrazione/Login/Recupero) ---
 def hash_password(password, salt=None):
     if salt is None:
         salt = secrets.token_hex(16)
@@ -388,6 +403,36 @@ def login_utente(nome, cognome, password):
                 return None, "Password errata."
     except Exception as e:
         return None, str(e)
+
+
+def aggiorna_password_utente(nome, cognome, cf, nuova_password):
+    try:
+        with engine.begin() as conn:
+            res = conn.execute(
+                text("""
+                    SELECT id FROM utenti 
+                    WHERE UPPER(nome) = :nome AND UPPER(cognome) = :cognome AND UPPER(codice_fiscale) = :cf
+                """),
+                {
+                    "nome": nome.strip().upper(),
+                    "cognome": cognome.strip().upper(),
+                    "cf": cf.strip().upper()
+                }
+            ).fetchone()
+            
+            if not res:
+                return False, "Nessun account trovato con i dati inseriti (Nome, Cognome e Codice Fiscale non corrispondono)."
+                
+            uid = res[0]
+            salt, pwd_hash = hash_password(nuova_password)
+            
+            conn.execute(
+                text("UPDATE utenti SET password_salt = :salt, password_hash = :pwd_hash WHERE id = :id"),
+                {"salt": salt, "pwd_hash": pwd_hash, "id": uid}
+            )
+        return True, "Password reimpostata con successo! Ora puoi effettuare il login."
+    except Exception as e:
+        return False, str(e)
 
 
 def get_orari_per_data(data):
@@ -1145,23 +1190,65 @@ else:
             tab_login, tab_registrazione = st.tabs(["🔑 Accedi", "📝 Registrati"])
 
             with tab_login:
-                with st.form("form_login_utente"):
-                    login_nome = st.text_input("Nome *", key="login_nome_input")
-                    login_cognome = st.text_input("Cognome *", key="login_cognome_input")
-                    login_password = st.text_input(
-                        "Password *", type="password", key="login_password_input"
-                    )
-                    submit_login = st.form_submit_button("Accedi")
-
-                    if submit_login:
-                        utente, msg_errore = login_utente(
-                            login_nome, login_cognome, login_password
-                        )
-                        if utente:
-                            st.session_state["utente_loggato"] = utente
+                if st.session_state.get("vista_recupero", False):
+                    st.markdown("##### 🔑 Reimposta Password")
+                    st.write("Inserisci Nome, Cognome, Codice Fiscale e la nuova password.")
+                    with st.form("form_recupero_password"):
+                        rec_nome = st.text_input("Nome *", key="rec_nome_input")
+                        rec_cognome = st.text_input("Cognome *", key="rec_cognome_input")
+                        rec_cf = st.text_input("Codice Fiscale *", key="rec_cf_input")
+                        rec_nuova_pw = st.text_input("Nuova Password *", type="password", key="rec_nuova_pw_input")
+                        rec_conf_pw = st.text_input("Conferma Nuova Password *", type="password", key="rec_conf_pw_input")
+                        
+                        col_r1, col_r2 = st.columns(2)
+                        with col_r1:
+                            submit_esegui_recupero = st.form_submit_button("Aggiorna Password", use_container_width=True)
+                        with col_r2:
+                            submit_torna_login = st.form_submit_button("Torna all'Accedi", use_container_width=True)
+                            
+                        if submit_torna_login:
+                            st.session_state["vista_recupero"] = False
                             st.rerun()
-                        else:
-                            st.error(f"❌ {msg_errore}")
+                            
+                        if submit_esegui_recupero:
+                            if rec_nuova_pw != rec_conf_pw:
+                                st.error("❌ Le password non coincidono.")
+                            elif not rec_nome or not rec_cognome or not rec_cf or not rec_nuova_pw:
+                                st.error("❌ Compila tutti i campi obbligatori.")
+                            else:
+                                successo, msg = aggiorna_password_utente(rec_nome, rec_cognome, rec_cf, rec_nuova_pw)
+                                if successo:
+                                    st.success(msg)
+                                    st.session_state["vista_recupero"] = False
+                                    st.rerun()
+                                else:
+                                    st.error(f"❌ {msg}")
+                else:
+                    with st.form("form_login_utente"):
+                        login_nome = st.text_input("Nome *", key="login_nome_input")
+                        login_cognome = st.text_input("Cognome *", key="login_cognome_input")
+                        login_password = st.text_input(
+                            "Password *", type="password", key="login_password_input"
+                        )
+                        
+                        col_b1, col_b2 = st.columns(2)
+                        with col_b1:
+                            submit_login = st.form_submit_button("Accedi", use_container_width=True)
+                        with col_b2:
+                            submit_recupero_click = st.form_submit_button("Password dimenticata?", use_container_width=True)
+
+                        if submit_login:
+                            utente, msg_errore = login_utente(
+                                login_nome, login_cognome, login_password
+                            )
+                            if utente:
+                                st.session_state["utente_loggato"] = utente
+                                st.rerun()
+                            else:
+                                st.error(f"❌ {msg_errore}")
+                        elif submit_recupero_click:
+                            st.session_state["vista_recupero"] = True
+                            st.rerun()
 
             with tab_registrazione:
                 with st.form("form_registrazione_utente"):
