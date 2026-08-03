@@ -188,14 +188,14 @@ st.markdown(
         display: none !important;
     }
 
-    /* Tab non selezionate: larghezza forzata e padding laterale molto ampio */
+    /* Tab non selezionate: larghezza bilanciata e armoniosa */
     .stTabs [data-baseweb="tab"] {
         background-color: #fff0f5;
         border-radius: 40px !important;
         color: #880E4F;
         font-weight: 600;
-        padding: 12px 65px !important; /* Padding laterale massiccio */
-        min-width: 170px !important;   /* Forza una larghezza minima generosa */
+        padding: 10px 40px !important; /* Padding laterale ridotto ma confortevole */
+        min-width: 125px !important;   /* Larghezza minima calibrata */
         text-align: center !important;
         font-size: 16px !important;
         border: 1.5px solid #fca4c3 !important;
@@ -213,8 +213,8 @@ st.markdown(
         color: #ffffff !important;
         border-color: #e882a4 !important;
         border-radius: 40px !important;
-        padding: 12px 65px !important;
-        min-width: 170px !important;
+        padding: 10px 40px !important;
+        min-width: 125px !important;
         box-shadow: 0 12px 30px rgba(232, 130, 164, 0.55) !important;
         transform: translateY(-5px) scale(1.04) !important;
         z-index: 999 !important;
