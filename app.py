@@ -2,6 +2,7 @@ from datetime import datetime, time, timedelta
 import os
 import re
 import sqlite3
+import urllib.parse
 import uuid
 from zoneinfo import ZoneInfo
 import pandas as pd
@@ -36,7 +37,7 @@ st.markdown(
         border: 1px solid #E0E0E0 !important;
     }
     
-    div.stButton > button, div.stDownloadButton > button {
+    div.stButton > button, div.stDownloadButton > button, div.stLinkButton > a {
         background-color: #D81B60 !important;
         color: white !important;
         border-radius: 12px !important;
@@ -46,10 +47,14 @@ st.markdown(
         width: 100% !important;
         padding: 12px 20px !important;
         margin-top: 5px !important;
+        text-align: center !important;
+        text-decoration: none !important;
+        display: block !important;
     }
     
-    div.stButton > button:hover, div.stDownloadButton > button:hover {
+    div.stButton > button:hover, div.stDownloadButton > button:hover, div.stLinkButton > a:hover {
         background-color: #C2185B !important;
+        color: white !important;
     }
     
     div[data-testid="stColumn"] div.stButton > button.btn-aggiorna {
@@ -190,7 +195,7 @@ def get_current_time_local():
         return datetime.now()
 
 
-# Funzione per generare il file ICS con titolo personalizzato (evita "evento personale")
+# Funzione per generare il file ICS (per Apple Calendar / Outlook)
 def genera_file_ics(nome_trattamento, data_str, ora_str):
     dt_inizio = datetime.strptime(f"{data_str} {ora_str}", "%Y-%m-%d %H:%M")
     dt_fine = dt_inizio + timedelta(minutes=50)
@@ -217,6 +222,27 @@ END:VALARM
 END:VEVENT
 END:VCALENDAR"""
     return ics_content
+
+
+# Funzione per generare il link diretto a Google Calendar (1 Click)
+def genera_link_google_calendar(nome_trattamento, data_str, ora_str):
+    dt_inizio = datetime.strptime(f"{data_str} {ora_str}", "%Y-%m-%d %H:%M")
+    dt_fine = dt_inizio + timedelta(minutes=50)
+    
+    fmt = "%Y%m%dT%H%M00"
+    titolo = f"Pilates: {nome_trattamento} - Dott.ssa Roberta Sinagra"
+    dettagli = "Appuntamento di Postura & Pilates con la Dott.ssa Roberta Sinagra.\nRicorda di portare i calzini antiscivolo e un asciugamano personale."
+    luogo = "Studio Dott.ssa Roberta Sinagra"
+    
+    params = {
+        "action": "TEMPLATE",
+        "text": titolo,
+        "dates": f"{dt_inizio.strftime(fmt)}/{dt_fine.strftime(fmt)}",
+        "details": dettagli,
+        "location": luogo
+    }
+    
+    return f"https://calendar.google.com/calendar/render?{urllib.parse.urlencode(params)}"
 
 
 logo_path = None
@@ -798,27 +824,31 @@ else:
             if "booking_success_msg" in st.session_state:
                 st.success(st.session_state["booking_success_msg"])
                 
-                if "ics_data" in st.session_state:
+                if "ics_data" in st.session_state and "google_cal_link" in st.session_state:
                     st.markdown("---")
-                    # Sezione visiva accattivante ed esplicita per il calendario dello smartphone
                     st.markdown(
                         """
                         <div style="background-color: #fff0f5; padding: 22px; border-radius: 14px; border: 2px solid #D81B60; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-                            <h3 style="color: #880E4F; margin-top: 0; font-size: 1.35rem;">📲 NON PERDERE L'APPUNTAMENTO!</h3>
-                            <p style="font-size: 1.05rem; color: #333; margin-bottom: 0; line-height: 1.5;">
-                                Aggiungi subito la lezione <b>al calendario del tuo smartphone</b> (Apple o Google Calendar). 
-                                Il telefono ti invierà un comodo <b>promemoria automatico</b> prima di venire in studio!
+                            <h3 style="color: #880E4F; margin-top: 0; font-size: 1.35rem;">📲 AGGIUNGI SUBITO AL CALENDARIO</h3>
+                            <p style="font-size: 1.05rem; color: #333; margin-bottom: 15px; line-height: 1.5;">
+                                Scegli come preferisci aggiungere l'appuntamento: con <b>Google Calendar</b> puoi salvarlo con un solo clic, oppure usa il pulsante per Apple/Outlook.
                             </p>
                         </div>
                         """,
                         unsafe_allow_html=True
                     )
                     
-                    # Pulsante di download centrato e ingrandito tramite colonne
-                    c_left, c_center, c_right = st.columns([1, 4, 1])
-                    with c_center:
+                    # Due pulsanti affiancati: uno per Google Calendar (1 click via Web) e uno per Apple/Outlook (.ics)
+                    col_gc, col_ap = st.columns(2)
+                    with col_gc:
+                        st.link_button(
+                            "📅 Google Calendar (1 Click)",
+                            st.session_state["google_cal_link"],
+                            use_container_width=True
+                        )
+                    with col_ap:
                         st.download_button(
-                            label="📅 AGGIUNGI SUBITO AL MIO CALENDARIO 📲",
+                            label="🍎 Apple / Outlook (.ics)",
                             data=st.session_state["ics_data"],
                             file_name="appuntamento_pilates.ics",
                             mime="text/calendar",
@@ -831,6 +861,8 @@ else:
                     del st.session_state["booking_success_msg"]
                     if "ics_data" in st.session_state:
                         del st.session_state["ics_data"]
+                    if "google_cal_link" in st.session_state:
+                        del st.session_state["google_cal_link"]
                     st.rerun()
             else:
                 with st.container(border=True):
@@ -1059,14 +1091,16 @@ else:
                             conn.commit()
                             conn.close()
 
-                            # Generazione del file ICS di calendario
+                            # Generazione file ICS e link Google Calendar diretto
                             ics_string = genera_file_ics(trattamento, str(data_scelta), ora_scelta)
+                            google_link = genera_link_google_calendar(trattamento, str(data_scelta), ora_scelta)
 
                             data_formattata = data_scelta.strftime("%d/%m/%Y")
                             st.session_state["booking_success_msg"] = (
                                 f"🎉 PRENOTAZIONE CONFERMATA!\n\nGrazie {nome.strip()} {cognome.strip()}, ti aspetto il {data_formattata} alle ore {ora_scelta} per {trattamento}."
                             )
                             st.session_state["ics_data"] = ics_string
+                            st.session_state["google_cal_link"] = google_link
                             st.session_state["reset_form_flag"] = True
                             st.rerun()
 
