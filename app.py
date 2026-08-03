@@ -797,7 +797,6 @@ else:
                     st.session_state["cf_2_input"] = ""
                 st.session_state["reset_form_flag"] = False
 
-            # Se è presente un messaggio di successo con file ics salvato in sessione
             if "booking_success_msg" in st.session_state:
                 st.success(st.session_state["booking_success_msg"])
                 
@@ -815,7 +814,6 @@ else:
                         unsafe_allow_html=True
                     )
                     
-                    # Pulsante di download del file ICS
                     st.download_button(
                         label="📅 Scarica e Salva in Calendario (.ics)",
                         data=st.session_state["ics_data"],
@@ -824,7 +822,6 @@ else:
                         use_container_width=True
                     )
                     
-                    # Spiegazione breve e intuitiva su come farlo a seconda del dispositivo
                     with st.expander("💡 Come faccio a salvarlo nel calendario del mio telefono o PC?"):
                         st.markdown("""
                         * **🍎 iPhone / iPad:** Tocca il file scaricato e seleziona **"Aggiungi a Calendario"** nel menu che compare.
@@ -834,7 +831,6 @@ else:
                     
                     st.markdown("---")
 
-                # Pulsante di ritorno chiaro e intuitivo
                 if st.button("⬅️ Torna Indietro / Effettua Nuova Prenotazione"):
                     del st.session_state["booking_success_msg"]
                     if "ics_data" in st.session_state:
@@ -960,6 +956,16 @@ else:
                     submitted = st.button("Conferma Prenotazione")
 
                 if submitted:
+                    # Normalizzazione automatica: iniziali maiuscole per nomi/cognomi e tutto maiuscolo per i CF
+                    nome = nome.strip().title()
+                    cognome = cognome.strip().title()
+                    codice_fiscale = codice_fiscale.strip().upper()
+                    
+                    if trattamento == "Pilates Duetto (in coppia)":
+                        nome_2 = nome_2.strip().title()
+                        cognome_2 = cognome_2.strip().title()
+                        codice_fiscale_2 = codice_fiscale_2.strip().upper()
+
                     conn_check = sqlite3.connect("prenotazioni.db")
                     c_check = conn_check.cursor()
                     c_check.execute(
@@ -1067,7 +1073,6 @@ else:
                             conn.commit()
                             conn.close()
 
-                            # Generazione file ICS universale
                             ics_string = genera_file_ics(trattamento, str(data_scelta), ora_scelta)
 
                             data_formattata = data_scelta.strftime("%d/%m/%Y")
