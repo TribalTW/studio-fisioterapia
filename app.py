@@ -528,15 +528,13 @@ if st.session_state["admin_logged_in"]:
                     "💾 Salva Presenze & Genera Codici"
                 )
                 if submit_presenze:
-                    conn = get_db_connection()
-                    c = conn.cursor()
-                    for app_id, nuovo_stato in presenze_dict.items():
-                        c.execute(
-                            "UPDATE prenotazioni SET stato_presenza = %s WHERE id = %s",
-                            (nuovo_stato, app_id),
-                        )
-                    conn.commit()
-                    conn.close()
+                    # Utilizziamo SQLAlchemy in modo rapido e sicuro con engine.begin()
+                    with engine.begin() as conn:
+                        for app_id, nuovo_stato in presenze_dict.items():
+                            conn.execute(
+                                text("UPDATE prenotazioni SET stato_presenza = :stato WHERE id = :pid"),
+                                {"stato": nuovo_stato, "pid": app_id}
+                            )
                     st.success("Presenze salvate con successo!")
                     st.rerun()
         else:
