@@ -673,7 +673,7 @@ if st.session_state["admin_logged_in"]:
         )
 
     with st.container(border=True):
-        st.subheader("🔒🔓 Gestione Chiusure e Sblocchi Studio")
+        st.subheader("🔓 Gestione Chiusure e Sblocchi Studio")
         st.write("Seleziona un giorno o un intervallo e gestisci la disponibilità.")
 
         col_bs1, col_bs2 = st.columns(2)
@@ -1142,8 +1142,7 @@ else:
             st.markdown(
                 """
                 <div class="box-info-carino">
-                    ✨ Crea un account una sola volta: alle prossime visite ti basterà accedere
-                    con nome, cognome e password, senza dover reinserire il Codice Fiscale ogni volta.
+                    ✨ Accedi o Registrati per poter prenotare la tua prossima lezione con pochi semplici click.
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -1547,7 +1546,7 @@ else:
             )
 
             st.markdown("---")
-            st.markdown("#### 💳 Tipologie di Abbonamenti e Tariffe")
+            st.markdown("#### 📋 Tipologie di Abbonamenti")
             st.markdown("""
                 * 🏷️ **Abbonamento Trimestrale:** 3 mesi, 2 volte a settimana (massimo 3 recuperi)
                 * 🏷️ **Abbonamento Mensile:** 1 mese, 2 volte a settimana (massimo 3 recuperi)
