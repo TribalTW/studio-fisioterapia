@@ -446,7 +446,7 @@ if st.session_state["admin_logged_in"]:
     with st.container(border=True):
         st.subheader("📋 Elenco Prenotazioni & Codici Fiscali")
         df = pd.read_sql_query(
-            "SELECT id, nome, codice_fiscale, codice_fiscale_2, data, ora, trattamento, stato_presenza, data_creazione, device_id FROM prenotazioni ORDER BY data DESC, ora ASC",
+            "SELECT id, email, codice_fiscale, codice_fiscale_2, data, ora, tipo AS trattamento, stato_presenza, device_id FROM prenotazioni ORDER BY data DESC, ora ASC",
             engine,
         )
 
