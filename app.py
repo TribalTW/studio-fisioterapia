@@ -8,7 +8,6 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import psycopg2
 import psycopg2.extras
-import sqlalchemy
 import streamlit as st
 import streamlit.components.v1 as components
 
@@ -19,7 +18,7 @@ st.set_page_config(
     layout="centered",
 )
 
-# Stile CSS Avanzato con Bottoni ad Alta Leggibilità
+# Stile CSS Avanzato con Bottoni ad Alta Leggibilità (Testo Bianco Forzato ovunque, inclusa la Sidebar)
 st.markdown(
     """
     <style>
@@ -50,10 +49,11 @@ st.markdown(
         box-shadow: 0 0 0 2px rgba(216, 27, 96, 0.15) !important;
     }
     
-    /* Pulsanti principali - Testo bianco brillante, leggibile e ben contrastato */
-    div.stButton > button, div.stDownloadButton > button {
+    /* Pulsanti principali e Sidebar - Testo bianco brillante, leggibile e ben contrastato */
+    div.stButton > button, div.stDownloadButton > button, section[data-testid="stSidebar"] div.stButton > button {
         background: linear-gradient(135deg, #E91E63 0%, #C2185B 100%) !important;
         color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
         border-radius: 12px !important;
         font-size: 1.05rem !important;
         font-weight: 700 !important;
@@ -68,11 +68,12 @@ st.markdown(
         transition: all 0.3s ease;
     }
     
-    div.stButton > button:hover, div.stDownloadButton > button:hover {
+    div.stButton > button:hover, div.stDownloadButton > button:hover, section[data-testid="stSidebar"] div.stButton > button:hover {
         background: linear-gradient(135deg, #D81B60 0%, #AD1457 100%) !important;
         box-shadow: 0 6px 16px rgba(216, 27, 96, 0.4);
         transform: translateY(-1px);
         color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
     }
     
     div[data-testid="stColumn"] div.stButton > button.btn-aggiorna {
@@ -129,9 +130,13 @@ def get_db_connection():
     return conn
 
 
-def get_sql_engine():
-    db_url = st.secrets["postgres"]["connection_string"]
-    return sqlalchemy.create_engine(db_url)
+def load_df(query, params=None):
+    conn = get_db_connection()
+    try:
+        df = pd.read_sql_query(query, conn, params=params)
+    finally:
+        conn.close()
+    return df
 
 
 # Inizializzazione Tabelle su Supabase
@@ -468,10 +473,8 @@ if st.session_state["admin_logged_in"]:
 
     with st.container(border=True):
         st.subheader("📋 Elenco Prenotazioni & Codici Fiscali")
-        engine = get_sql_engine()
-        df = pd.read_sql_query(
-            "SELECT id, nome, codice_fiscale, codice_fiscale_2, data, ora, trattamento, stato_presenza, data_creazione, device_id FROM prenotazioni ORDER BY data DESC, ora ASC",
-            engine,
+        df = load_df(
+            "SELECT id, nome, codice_fiscale, codice_fiscale_2, data, ora, trattamento, stato_presenza, data_creazione, device_id FROM prenotazioni ORDER BY data DESC, ora ASC"
         )
 
         if not df.empty:
@@ -564,7 +567,7 @@ if st.session_state["admin_logged_in"]:
         st.markdown("---")
         st.markdown("#### 📈 Riepilogo e Calcolo Totale Sedute (Gestionale)")
         if st.button("📊 Calcola Statistiche e Sedute Svolte per Cliente"):
-            df_stat = pd.read_sql_query(
+            df_stat = load_df(
                 """
                 SELECT nome, 
                        COUNT(CASE WHEN stato_presenza = 'Presente' THEN 1 END) AS sedute_effettuate,
@@ -574,14 +577,13 @@ if st.session_state["admin_logged_in"]:
                 WHERE device_id != 'SYSTEM'
                 GROUP BY nome
                 ORDER BY sedute_effettuate DESC
-            """,
-                engine,
+            """
             )
             if not df_stat.empty:
                 st.dataframe(df_stat, use_container_width=True)
                 st.success("💡 Report calcolato con successo!")
             else:
-                st.info("Nastro dati insufficiente per le statistiche.")
+                st.info("Nessun dato sufficiente per le statistiche.")
 
     with st.container(border=True):
         st.subheader("📷 QR Code Check-in Ingresso Studio")
@@ -740,9 +742,8 @@ if st.session_state["admin_logged_in"]:
 
         with col_sec2:
             st.markdown("##### Banna Utente Individuale")
-            df_prenotazioni_attive = pd.read_sql_query(
-                "SELECT id, nome, trattamento, device_id FROM prenotazioni WHERE device_id != 'SYSTEM'",
-                engine,
+            df_prenotazioni_attive = load_df(
+                "SELECT id, nome, trattamento, device_id FROM prenotazioni WHERE device_id != 'SYSTEM'"
             )
 
             if not df_prenotazioni_attive.empty:
@@ -775,22 +776,21 @@ if st.session_state["admin_logged_in"]:
                             (dev_id_da_bannare,),
                         )
                         conn.commit()
-                        st.success(f"Utente bannato con successo!")
+                        st.success("Utente bannato con successo!")
                     conn.close()
                     st.rerun()
             else:
                 st.info("Nessuna prenotazione disponibile.")
 
         st.markdown("##### 📋 Blacklist Dispositivi")
-        df_banned = pd.read_sql_query(
+        df_banned = load_df(
             """
             SELECT b.device_id, 
                    COALESCE(STRING_AGG(DISTINCT p.nome, ', '), 'Nessun nome') AS nominativi_utilizzati
             FROM banned_devices b
             LEFT JOIN prenotazioni p ON b.device_id = p.device_id
             GROUP BY b.device_id
-        """,
-            engine,
+        """
         )
 
         if not df_banned.empty:
@@ -820,9 +820,8 @@ if st.session_state["admin_logged_in"]:
             "Puoi eliminarne uno se richiesto."
         )
 
-        df_utenti = pd.read_sql_query(
-            "SELECT id, nome, cognome, codice_fiscale, data_registrazione FROM utenti ORDER BY data_registrazione DESC",
-            engine,
+        df_utenti = load_df(
+            "SELECT id, nome, cognome, codice_fiscale, data_registrazione FROM utenti ORDER BY data_registrazione DESC"
         )
 
         if not df_utenti.empty:
