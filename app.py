@@ -17,6 +17,7 @@ st.set_page_config(
     page_icon="🧘‍♀️",
     layout="wide",
 )
+st.sidebar.image("percorso_al_tuo_logo.png", width=180)
 
 # Connessione a Supabase / PostgreSQL con caching delle risorse
 @st.cache_resource
