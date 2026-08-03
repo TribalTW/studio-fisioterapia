@@ -176,62 +176,6 @@ st.markdown(
         font-size: 0.98rem !important;
         box-shadow: 0 4px 15px rgba(252, 164, 195, 0.15) !important;
     }
-    
-    /* Stile delle Tab di navigazione - Uniforme e a capsula */
-    .stTabs, .stTabs [data-baseweb="tab-list"], .stTabs div {
-        overflow: visible !important;
-    }
-
-    .stTabs [data-baseweb="tab-highlight"] {
-        display: none !important;
-    }
-
-    .stTabs [data-baseweb="tab-list"] {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        justify-content: center !important;
-        gap: 8px !important;
-    }
-
-    .stTabs [data-baseweb="tab"] {
-        background-color: #fff0f5;
-        border-radius: 40px !important;
-        color: #880E4F;
-        font-weight: 600;
-        padding: 10px 24px !important;
-        text-align: center !important;
-        font-size: 15px !important;
-        border: 1.5px solid #fca4c3 !important;
-        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
-        flex: 1 1 auto !important;
-    }
-
-    .stTabs [data-baseweb="tab"]:hover {
-        background-color: #ffe4ec;
-        transform: translateY(-2px);
-    }
-
-    .stTabs [aria-selected="true"] {
-        background: linear-gradient(135deg, #fca4c3 0%, #e882a4) !important;
-        color: #ffffff !important;
-        border-color: #e882a4 !important;
-        border-radius: 40px !important;
-        padding: 10px 24px !important;
-        box-shadow: 0 12px 30px rgba(232, 130, 164, 0.55) !important;
-        transform: translateY(-4px) scale(1.03) !important;
-        z-index: 999 !important;
-    }
-
-    @media (max-width: 768px) {
-        .stTabs [data-baseweb="tab"] {
-            padding: 8px 14px !important;
-            font-size: 13px !important;
-            min-width: auto !important;
-        }
-        .stTabs [aria-selected="true"] {
-            padding: 8px 14px !important;
-        }
-    }
 
     .stCaption, p {
         text-align: center;
@@ -1173,15 +1117,33 @@ else:
             st.markdown(
                 """
                 <div class="box-info-carino">
-                    ✨ Accedi o Registrati per prenotare la tua prossima lezione in pochi semplici click.
+                    ✨ Accedi, Registrati o Recupera la tua password per gestire le tue lezioni in studio.
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
 
-            tab_login, tab_registrazione, tab_recupero = st.tabs(["🔑 Accedi", "📝 Registrati", "🔄 Recupera Password"])
+            if "auth_tab_scelta" not in st.session_state:
+                st.session_state["auth_tab_scelta"] = "🔑 Accedi"
 
-            with tab_login:
+            col_btn_t1, col_btn_t2, col_btn_t3 = st.columns(3)
+            with col_btn_t1:
+                if st.button("🔑 Accedi", use_container_width=True, key="btn_nav_accedi"):
+                    st.session_state["auth_tab_scelta"] = "🔑 Accedi"
+                    st.rerun()
+            with col_btn_t2:
+                if st.button("📝 Registrati", use_container_width=True, key="btn_nav_registra"):
+                    st.session_state["auth_tab_scelta"] = "📝 Registrati"
+                    st.rerun()
+            with col_btn_t3:
+                if st.button("🔄 Recupera Password", use_container_width=True, key="btn_nav_recupera"):
+                    st.session_state["auth_tab_scelta"] = "🔄 Recupera Password"
+                    st.rerun()
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            if st.session_state["auth_tab_scelta"] == "🔑 Accedi":
+                st.markdown("### 🔑 Accedi al tuo account")
                 with st.form("form_login_utente"):
                     login_nome = st.text_input("Nome *", key="login_nome_input")
                     login_cognome = st.text_input("Cognome *", key="login_cognome_input")
@@ -1200,7 +1162,8 @@ else:
                         else:
                             st.error(f"❌ {msg_errore}")
 
-            with tab_registrazione:
+            elif st.session_state["auth_tab_scelta"] == "📝 Registrati":
+                st.markdown("### 📝 Registra un nuovo account")
                 with st.form("form_registrazione_utente"):
                     reg_nome = st.text_input("Nome *", key="reg_nome_input")
                     reg_cognome = st.text_input("Cognome *", key="reg_cognome_input")
@@ -1225,7 +1188,8 @@ else:
                             else:
                                 st.error(f"❌ {msg}")
 
-            with tab_recupero:
+            elif st.session_state["auth_tab_scelta"] == "🔄 Recupera Password":
+                st.markdown("### 🔄 Recupera / Reimposta Password")
                 with st.form("form_recupero_password"):
                     rec_nome = st.text_input("Nome *", key="rec_nome_input")
                     rec_cognome = st.text_input("Cognome *", key="rec_cognome_input")
@@ -1249,6 +1213,9 @@ else:
                             )
                             if successo:
                                 st.success(msg)
+                                # Svuota i campi e reindirizza alla pagina di login
+                                st.session_state["auth_tab_scelta"] = "🔑 Accedi"
+                                st.rerun()
                             else:
                                 st.error(f"❌ {msg}")
 
