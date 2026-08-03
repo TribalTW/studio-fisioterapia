@@ -889,21 +889,19 @@ else:
                     )
             else:
                 with st.container(border=True):
-                    st.markdown(
-                        "**Benvenuto/a in studio! 🧘‍♀️ Inserisci il tuo Codice Fiscale per confermare l'arrivo:**"
-                    )
-                    with st.form("form_checkin_cliente_automatico"):
-                        chk_cf = st.text_input("Il tuo Codice Fiscale *")
-                        submit_checkin = st.form_submit_button(
-                            "✅ Conferma la mia Presenza"
-                        )
+                    # Controlla se l'utente è già loggato nella sessione principale
+                    utente_già_loggato = st.session_state.get("utente_loggato", None)
 
-                        if submit_checkin:
-                            cf_pulito = chk_cf.strip().upper()
+                    if utente_già_loggato:
+                        st.markdown(f"**Benvenuto/a, {utente_già_loggato['nome']} {utente_già_loggato['cognome']}! 🧘‍♀️**")
+                        st.write("Clicca sul pulsante sottostante per confermare il tuo arrivo in studio.")
+                        
+                        with st.form("form_checkin_veloce"):
+                            submit_checkin_veloce = st.form_submit_button("✅ Conferma la mia Presenza")
 
-                            if not cf_pulito:
-                                st.error("Per favore, inserisci il tuo codice fiscale.")
-                            else:
+                            if submit_checkin_veloce:
+                                cf_utente = utente_già_loggato["codice_fiscale"]
+
                                 conn = get_db_connection()
                                 c = conn.cursor()
                                 c.execute(
@@ -914,13 +912,13 @@ else:
                                       AND device_id != 'SYSTEM' 
                                       AND (UPPER(codice_fiscale) = %s OR UPPER(codice_fiscale_2) = %s)
                                     """,
-                                    (oggi_str, cf_pulito, cf_pulito),
+                                    (oggi_str, cf_utente, cf_utente),
                                 )
                                 appuntamenti_trovati = c.fetchall()
                                 conn.close()
 
                                 if not appuntamenti_trovati:
-                                    st.error("❌ Nessuna prenotazione trovata con questo Codice Fiscale per oggi.")
+                                    st.error("❌ Nessuna prenotazione trovata a tuo nome per oggi.")
                                 else:
                                     appuntamento_valido = None
                                     for (
@@ -972,6 +970,103 @@ else:
                                         st.error(
                                             "⏳ Il check-in è consentito solo nell'orario prossimo al tuo appuntamento."
                                         )
+                    else:
+                        # Se non è loggato, mostra il form con la richiesta password
+                        st.markdown(
+                            "**Benvenuto/a in studio! 🧘‍♀️ Inserisci i dati del tuo account per confermare l'arrivo:**"
+                        )
+                        with st.form("form_checkin_cliente_automatico"):
+                            chk_nome = st.text_input("Nome *")
+                            chk_cognome = st.text_input("Cognome *")
+                            chk_password = st.text_input("Password dell'account *", type="password")
+                            submit_checkin = st.form_submit_button(
+                                "✅ Conferma la mia Presenza"
+                            )
+
+                            if submit_checkin:
+                                chk_nome_clean = chk_nome.strip().title()
+                                chk_cognome_clean = chk_cognome.strip().title()
+
+                                if not chk_nome_clean or not chk_cognome_clean or not chk_password:
+                                    st.error("Per favore, compila tutti i campi.")
+                                else:
+                                    utente_verificato, msg_err = login_utente(
+                                        chk_nome_clean, chk_cognome_clean, chk_password
+                                    )
+
+                                    if not utente_verificato:
+                                        st.error(f"❌ Credenziali non valide: {msg_err}")
+                                    else:
+                                        cf_utente = utente_verificato["codice_fiscale"]
+
+                                        conn = get_db_connection()
+                                        c = conn.cursor()
+                                        c.execute(
+                                            """
+                                            SELECT id, nome, trattamento, ora, stato_presenza 
+                                            FROM prenotazioni 
+                                            WHERE data = %s 
+                                              AND device_id != 'SYSTEM' 
+                                              AND (UPPER(codice_fiscale) = %s OR UPPER(codice_fiscale_2) = %s)
+                                            """,
+                                            (oggi_str, cf_utente, cf_utente),
+                                        )
+                                        appuntamenti_trovati = c.fetchall()
+                                        conn.close()
+
+                                        if not appuntamenti_trovati:
+                                            st.error("❌ Nessuna prenotazione trovata a tuo nome per oggi.")
+                                        else:
+                                            appuntamento_valido = None
+                                            for (
+                                                p_id, p_nome, p_tratt, p_ora, p_stato,
+                                            ) in appuntamenti_trovati:
+                                                ora_app = datetime.strptime(
+                                                    p_ora, "%H:%M"
+                                                ).time()
+                                                dt_app = datetime.combine(
+                                                    datetime.today(), ora_app
+                                                )
+
+                                                inizio_finestra = (
+                                                    dt_app - timedelta(minutes=45)
+                                                ).time()
+                                                fine_finestra = (
+                                                    dt_app + timedelta(minutes=30)
+                                                ).time()
+
+                                                if (
+                                                    inizio_finestra
+                                                    <= current_time
+                                                    <= fine_finestra
+                                                ):
+                                                    appuntamento_valido = (
+                                                        p_id, p_nome, p_tratt, p_ora
+                                                    )
+                                                    break
+
+                                            if appuntamento_valido:
+                                                p_id, p_nome, p_tratt, p_ora = (
+                                                    appuntamento_valido
+                                                )
+
+                                                conn = get_db_connection()
+                                                c = conn.cursor()
+                                                c.execute(
+                                                    "UPDATE prenotazioni SET stato_presenza = 'Presente' WHERE id = %s",
+                                                    (p_id,),
+                                                )
+                                                conn.commit()
+                                                conn.close()
+
+                                                st.session_state["checkin_successo"] = (
+                                                    p_id, p_nome, p_tratt, p_ora, oggi_str,
+                                                )
+                                                st.rerun()
+                                            else:
+                                                st.error(
+                                                    "⏳ Il check-in è consentito solo nell'orario prossimo al tuo appuntamento."
+                                                )
 
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("🏠 Torna alla Home principale"):
