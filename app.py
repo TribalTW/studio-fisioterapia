@@ -178,17 +178,14 @@ st.markdown(
     }
     
     /* Stile delle Tab di navigazione - Uniforme e a capsula */
-    /* Sblocca i contenitori per evitare qualsiasi taglio */
     .stTabs, .stTabs [data-baseweb="tab-list"], .stTabs div {
         overflow: visible !important;
     }
 
-    /* Nasconde la linea standard di Streamlit */
     .stTabs [data-baseweb="tab-highlight"] {
         display: none !important;
     }
 
-    /* Gestione flessibile della lista delle tab */
     .stTabs [data-baseweb="tab-list"] {
         display: flex !important;
         flex-wrap: wrap !important;
@@ -196,7 +193,6 @@ st.markdown(
         gap: 8px !important;
     }
 
-    /* Stile base delle tab (valido per Login, Registrazione e Menu principale) */
     .stTabs [data-baseweb="tab"] {
         background-color: #fff0f5;
         border-radius: 40px !important;
@@ -215,7 +211,6 @@ st.markdown(
         transform: translateY(-2px);
     }
 
-    /* Tab selezionata in primo piano con effetto fluttuante */
     .stTabs [aria-selected="true"] {
         background: linear-gradient(135deg, #fca4c3 0%, #e882a4) !important;
         color: #ffffff !important;
@@ -227,7 +222,6 @@ st.markdown(
         z-index: 999 !important;
     }
 
-    /* Adattamento automatico per smartphone e schermi piccoli */
     @media (max-width: 768px) {
         .stTabs [data-baseweb="tab"] {
             padding: 8px 14px !important;
@@ -272,7 +266,6 @@ def calcola_iniziali_cf(cognome, nome):
     return cognome_cf, nome_cf
 
 
-# Tabelle ufficiali per il calcolo del carattere di controllo del Codice Fiscale
 _VALORI_DISPARI = {
     "0": 1, "1": 0, "2": 5, "3": 7, "4": 9, "5": 13, "6": 15, "7": 17, "8": 19, "9": 21,
     "A": 1, "B": 0, "C": 5, "D": 7, "E": 9, "F": 13, "G": 15, "H": 17, "I": 19, "J": 21,
@@ -318,7 +311,7 @@ def valida_codice_fiscale(nome, cognome, cf):
     return True, ""
 
 
-# --- Funzioni di supporto per Account Utenti (Registrazione/Login) ---
+# --- Funzioni di supporto per Account Utenti (Registrazione/Login/Recupero) ---
 def hash_password(password, salt=None):
     if salt is None:
         salt = secrets.token_hex(16)
@@ -394,6 +387,44 @@ def login_utente(nome, cognome, password):
                 return None, "Password errata."
     except Exception as e:
         return None, str(e)
+
+
+def reset_password_utente(nome, cognome, cf, nuova_password):
+    salt, pwd_hash = hash_password(nuova_password)
+    try:
+        with engine.begin() as conn:
+            res = conn.execute(
+                text("""
+                    SELECT id FROM utenti 
+                    WHERE UPPER(nome) = :nome AND UPPER(cognome) = :cognome AND UPPER(codice_fiscale) = :cf
+                """),
+                {
+                    "nome": nome.strip().upper(),
+                    "cognome": cognome.strip().upper(),
+                    "cf": cf.strip().upper()
+                }
+            ).fetchone()
+            
+            if not res:
+                return False, "Nessun account trovato con i dati inseriti (Nome, Cognome e Codice Fiscale non coincidono)."
+            
+            conn.execute(
+                text("""
+                    UPDATE utenti 
+                    SET password_salt = :salt, password_hash = :pwd_hash 
+                    WHERE UPPER(nome) = :nome AND UPPER(cognome) = :cognome AND UPPER(codice_fiscale) = :cf
+                """),
+                {
+                    "salt": salt,
+                    "pwd_hash": pwd_hash,
+                    "nome": nome.strip().upper(),
+                    "cognome": cognome.strip().upper(),
+                    "cf": cf.strip().upper()
+                }
+            )
+        return True, "Password aggiornata con successo! Ora puoi effettuare l'accesso con la nuova password."
+    except Exception as e:
+        return False, str(e)
 
 
 def get_orari_per_data(data):
@@ -1129,7 +1160,7 @@ else:
 
             st.stop()
 
-        # --- GATE DI ACCESSO: Login / Registrazione Account Cliente ---
+        # --- GATE DI ACCESSO: Login / Registrazione / Recupero Account Cliente ---
         if "utente_loggato" not in st.session_state:
             if logo_path:
                 c1, c2, c3 = st.columns([1, 2, 1])
@@ -1142,13 +1173,13 @@ else:
             st.markdown(
                 """
                 <div class="box-info-carino">
-                    ✨ Accedi o Registrati per poter prenotare la tua prossima lezione con pochi semplici click.
+                    ✨ Accedi, Registrati o Recupera la tua password per gestire le tue lezioni in studio.
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
 
-            tab_login, tab_registrazione = st.tabs(["🔑 Accedi", "📝 Registrati"])
+            tab_login, tab_registrazione, tab_recupero = st.tabs(["🔑 Accedi", "📝 Registrati", "🔄 Recupera Password"])
 
             with tab_login:
                 with st.form("form_login_utente"):
@@ -1188,6 +1219,33 @@ else:
                         else:
                             successo, msg = registra_utente(
                                 reg_nome, reg_cognome, reg_cf, reg_password
+                            )
+                            if successo:
+                                st.success(msg)
+                            else:
+                                st.error(f"❌ {msg}")
+
+            with tab_recupero:
+                with st.form("form_recupero_password"):
+                    rec_nome = st.text_input("Nome *", key="rec_nome_input")
+                    rec_cognome = st.text_input("Cognome *", key="rec_cognome_input")
+                    rec_cf = st.text_input("Codice Fiscale *", key="rec_cf_input")
+                    rec_nuova_password = st.text_input(
+                        "Nuova Password *", type="password", key="rec_nuova_password_input"
+                    )
+                    rec_nuova_password_conferma = st.text_input(
+                        "Conferma Nuova Password *", type="password", key="rec_nuova_password_conferma_input"
+                    )
+                    submit_recupero = st.form_submit_button("Reimposta Password")
+
+                    if submit_recupero:
+                        if rec_nuova_password != rec_nuova_password_conferma:
+                            st.error("❌ Le due password inserite non coincidono.")
+                        elif not rec_nome.strip() or not rec_cognome.strip() or not rec_cf.strip() or not rec_nuova_password:
+                            st.error("Per favore, compila tutti i campi richiesti.")
+                        else:
+                            successo, msg = reset_password_utente(
+                                rec_nome, rec_cognome, rec_cf, rec_nuova_password
                             )
                             if successo:
                                 st.success(msg)
