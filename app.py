@@ -10,6 +10,7 @@ import psycopg2
 import streamlit as st
 import streamlit.components.v1 as components
 from sqlalchemy import create_engine
+from sqlalchemy import text
 
 # Configurazione Pagina
 st.set_page_config(
@@ -187,68 +188,72 @@ def verifica_password(password, salt, pwd_hash_atteso):
     return secrets.compare_digest(pwd_hash_calcolato, pwd_hash_atteso)
 
 
-def registra_utente(nome, cognome, codice_fiscale, password):
-    nome = nome.strip().title()
-    cognome = cognome.strip().title()
-    cf = codice_fiscale.strip().upper()
-
-    if not nome or not cognome or not cf or not password:
-        return False, "Per favore compila tutti i campi."
-
-    if len(password) < 6:
-        return False, "La password deve contenere almeno 6 caratteri."
-
-    cf_valido, cf_msg = valida_codice_fiscale(nome, cognome, cf)
-    if not cf_valido:
-        return False, f"❌ Codice Fiscale non valido: {cf_msg}"
-
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT id FROM utenti WHERE codice_fiscale = %s", (cf,))
-    if c.fetchone():
-        conn.close()
-        return False, "Esiste già un account registrato con questo Codice Fiscale. Prova ad accedere invece di registrarti."
-
+def registra_utente(nome, cognome, cf, password):
+    # Generazione hash e salt (come già fai)
     salt, pwd_hash = hash_password(password)
-    data_reg = get_current_time_local().strftime("%Y-%m-%d %H:%M")
-    c.execute(
-        "INSERT INTO utenti (nome, cognome, codice_fiscale, password_salt, password_hash, data_registrazione) VALUES (%s, %s, %s, %s, %s, %s)",
-        (nome, cognome, cf, salt, pwd_hash, data_reg),
-    )
-    conn.commit()
-    conn.close()
-    return True, "✅ Registrazione completata con successo! Ora puoi accedere."
+    data_reg = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    try:
+        # Usa il pool di SQLAlchemy: velocissimo!
+        with engine.begin() as conn:
+            # Controlla se esiste già
+            res = conn.execute(
+                text("SELECT id FROM utenti WHERE codice_fiscale = :cf"),
+                {"cf": cf.upper()}
+            ).fetchone()
+            
+            if res:
+                return False, "Esiste già un utente registrato con questo Codice Fiscale."
+            
+            # Inserisce il nuovo utente
+            conn.execute(
+                text("""
+                    INSERT INTO utenti (nome, cognome, codice_fiscale, password_salt, password_hash, data_registrazione) 
+                    VALUES (:nome, :cognome, :cf, :salt, :pwd_hash, :data_reg)
+                """),
+                {
+                    "nome": nome.title(),
+                    "cognome": cognome.title(),
+                    "cf": cf.upper(),
+                    "salt": salt,
+                    "pwd_hash": pwd_hash,
+                    "data_reg": data_reg
+                }
+            )
+        return True, "Registrazione completata con successo!"
+    except Exception as e:
+        return False, str(e)
 
 
 def login_utente(nome, cognome, password):
-    nome = nome.strip().title()
-    cognome = cognome.strip().title()
-
-    if not nome or not cognome or not password:
-        return None, "Per favore inserisci nome, cognome e password."
-
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute(
-        "SELECT id, nome, cognome, codice_fiscale, password_salt, password_hash FROM utenti WHERE UPPER(nome) = UPPER(%s) AND UPPER(cognome) = UPPER(%s)",
-        (nome, cognome),
-    )
-    candidati = c.fetchall()
-    conn.close()
-
-    if not candidati:
-        return None, "Nessun account trovato con questo nome e cognome. Registrati prima di accedere."
-
-    for u_id, u_nome, u_cognome, u_cf, salt, pwd_hash in candidati:
-        if verifica_password(password, salt, pwd_hash):
-            return {
-                "id": u_id,
-                "nome": u_nome,
-                "cognome": u_cognome,
-                "codice_fiscale": u_cf,
-            }, ""
-
-    return None, "Password errata."
+    try:
+        with engine.begin() as conn:
+            res = conn.execute(
+                text("""
+                    SELECT id, nome, cognome, codice_fiscale, password_salt, password_hash 
+                    FROM utenti 
+                    WHERE UPPER(nome) = :nome AND UPPER(cognome) = :cognome
+                """),
+                {"nome": nome.strip().upper(), "cognome": cognome.strip().upper()}
+            ).fetchone()
+            
+            if not res:
+                return None, "Utente non trovato."
+                
+            uid, u_nome, u_cognome, u_cf, salt, pwd_hash = res
+            
+            # Verifica la password
+            if verify_password(password, salt, pwd_hash):
+                return {
+                    "id": uid,
+                    "nome": u_nome,
+                    "cognome": u_cognome,
+                    "codice_fiscale": u_cf
+                }, None
+            else:
+                return None, "Password errata."
+    except Exception as e:
+        return None, str(e)
 
 
 # Inizializzazione Database PostgreSQL / Supabase
