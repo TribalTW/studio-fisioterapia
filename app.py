@@ -176,24 +176,29 @@ st.markdown(
         font-size: 0.98rem !important;
         box-shadow: 0 4px 15px rgba(252, 164, 195, 0.15) !important;
     }
-
-    /* Stile delle Tab di navigazione */
-    /* Stile delle Tab di navigazione */
+    
+    /* Stile delle Tab di navigazione - Uniforme e a capsula */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 10px;
+        gap: 12px;
         justify-content: center;
         border-bottom: none !important;
         overflow: visible !important;
     }
 
+    /* Nasconde la barra/linea nativa di Streamlit sotto le tab */
+    .stTabs [data-baseweb="tab-highlight"] {
+        display: none !important;
+    }
+
     .stTabs [data-baseweb="tab"] {
         background-color: #fff0f5;
-        border-radius: 14px !important; /* Arrotondate su tutti i lati (stile pillola) */
+        border-radius: 50px !important; /* Forma a pillola / capsula perfetta */
         color: #880E4F;
         font-weight: 600;
-        padding: 10px 22px;
+        padding: 8px 22px !important;
+        height: auto !important;
         border: 1.5px solid #fca4c3 !important;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        transition: all 0.3s ease !important;
     }
 
     .stTabs [data-baseweb="tab"]:hover {
@@ -205,9 +210,9 @@ st.markdown(
         background: linear-gradient(135deg, #fca4c3 0%, #e882a4) !important;
         color: #ffffff !important;
         border-color: #e882a4 !important;
-        border-radius: 14px !important; /* Assicura l'arrotondamento anche da selezionato */
-        box-shadow: 0 8px 20px rgba(252, 164, 195, 0.45) !important;
-        transform: translateY(-3px) !important; /* Effetto sovrapposizione verso l'alto */
+        border-radius: 50px !important; /* Conferma la forma arrotondata anche da attivo */
+        box-shadow: 0 6px 18px rgba(252, 164, 195, 0.45) !important;
+        transform: translateY(-2px) !important;
         z-index: 10;
     }
 
@@ -216,7 +221,7 @@ st.markdown(
     }
 
     #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
+    <footer>visibility: hidden;</footer>
     </style>
 """,
     unsafe_allow_html=True,
