@@ -1,6 +1,8 @@
 from datetime import datetime, time, timedelta
+import hashlib
 import os
 import re
+import secrets
 import sqlite3
 import uuid
 from zoneinfo import ZoneInfo
@@ -113,6 +115,85 @@ def valida_codice_fiscale(nome, cognome, cf):
     return True, ""
 
 
+# --- Funzioni di supporto per Account Utenti (Registrazione/Login) ---
+def hash_password(password, salt=None):
+    if salt is None:
+        salt = secrets.token_hex(16)
+    pwd_hash = hashlib.pbkdf2_hmac(
+        "sha256", password.encode("utf-8"), salt.encode("utf-8"), 100_000
+    ).hex()
+    return salt, pwd_hash
+
+
+def verifica_password(password, salt, pwd_hash_atteso):
+    _, pwd_hash_calcolato = hash_password(password, salt)
+    return secrets.compare_digest(pwd_hash_calcolato, pwd_hash_atteso)
+
+
+def registra_utente(nome, cognome, codice_fiscale, password):
+    nome = nome.strip().title()
+    cognome = cognome.strip().title()
+    cf = codice_fiscale.strip().upper()
+
+    if not nome or not cognome or not cf or not password:
+        return False, "Per favore compila tutti i campi."
+
+    if len(password) < 6:
+        return False, "La password deve contenere almeno 6 caratteri."
+
+    cf_valido, cf_msg = valida_codice_fiscale(nome, cognome, cf)
+    if not cf_valido:
+        return False, f"❌ Codice Fiscale non valido: {cf_msg}"
+
+    conn = sqlite3.connect("prenotazioni.db")
+    c = conn.cursor()
+    c.execute("SELECT id FROM utenti WHERE codice_fiscale = ?", (cf,))
+    if c.fetchone():
+        conn.close()
+        return False, "Esiste già un account registrato con questo Codice Fiscale. Prova ad accedere invece di registrarti."
+
+    salt, pwd_hash = hash_password(password)
+    data_reg = get_current_time_local().strftime("%Y-%m-%d %H:%M")
+    c.execute(
+        "INSERT INTO utenti (nome, cognome, codice_fiscale, password_salt, password_hash, data_registrazione) VALUES (?, ?, ?, ?, ?, ?)",
+        (nome, cognome, cf, salt, pwd_hash, data_reg),
+    )
+    conn.commit()
+    conn.close()
+    return True, "✅ Registrazione completata con successo! Ora puoi accedere."
+
+
+def login_utente(nome, cognome, password):
+    nome = nome.strip().title()
+    cognome = cognome.strip().title()
+
+    if not nome or not cognome or not password:
+        return None, "Per favore inserisci nome, cognome e password."
+
+    conn = sqlite3.connect("prenotazioni.db")
+    c = conn.cursor()
+    c.execute(
+        "SELECT id, nome, cognome, codice_fiscale, password_salt, password_hash FROM utenti WHERE UPPER(nome) = UPPER(?) AND UPPER(cognome) = UPPER(?)",
+        (nome, cognome),
+    )
+    candidati = c.fetchall()
+    conn.close()
+
+    if not candidati:
+        return None, "Nessun account trovato con questo nome e cognome. Registrati prima di accedere."
+
+    for u_id, u_nome, u_cognome, u_cf, salt, pwd_hash in candidati:
+        if verifica_password(password, salt, pwd_hash):
+            return {
+                "id": u_id,
+                "nome": u_nome,
+                "cognome": u_cognome,
+                "codice_fiscale": u_cf,
+            }, ""
+
+    return None, "Password errata."
+
+
 # Inizializzazione Database SQLite
 def init_db():
     conn = sqlite3.connect("prenotazioni.db")
@@ -146,6 +227,18 @@ def init_db():
     c.execute("""
         CREATE TABLE IF NOT EXISTS banned_devices (
             device_id TEXT PRIMARY KEY
+        )
+    """)
+
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS utenti (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL,
+            cognome TEXT NOT NULL,
+            codice_fiscale TEXT NOT NULL UNIQUE,
+            password_salt TEXT NOT NULL,
+            password_hash TEXT NOT NULL,
+            data_registrazione TEXT NOT NULL
         )
     """)
     conn.commit()
@@ -788,13 +881,85 @@ else:
 
             st.stop()
 
+        # --- GATE DI ACCESSO: Login / Registrazione Account Cliente ---
+        if "utente_loggato" not in st.session_state:
+            if logo_path:
+                c1, c2, c3 = st.columns([1, 2, 1])
+                with c2:
+                    st.image(logo_path, use_container_width=True)
+
+            st.title("Postura & Pilates")
+            st.write("**Dott.ssa Roberta Sinagra**")
+            st.markdown("#### 👤 Accedi al tuo account o registrati")
+            st.write(
+                "Crea un account una sola volta: alle prossime visite ti basterà accedere "
+                "con nome, cognome e password, senza dover reinserire il Codice Fiscale ogni volta."
+            )
+
+            tab_login, tab_registrazione = st.tabs(["🔑 Accedi", "📝 Registrati"])
+
+            with tab_login:
+                with st.form("form_login_utente"):
+                    login_nome = st.text_input("Nome *", key="login_nome_input")
+                    login_cognome = st.text_input("Cognome *", key="login_cognome_input")
+                    login_password = st.text_input(
+                        "Password *", type="password", key="login_password_input"
+                    )
+                    submit_login = st.form_submit_button("Accedi")
+
+                    if submit_login:
+                        utente, msg_errore = login_utente(
+                            login_nome, login_cognome, login_password
+                        )
+                        if utente:
+                            st.session_state["utente_loggato"] = utente
+                            st.rerun()
+                        else:
+                            st.error(f"❌ {msg_errore}")
+
+            with tab_registrazione:
+                with st.form("form_registrazione_utente"):
+                    reg_nome = st.text_input("Nome *", key="reg_nome_input")
+                    reg_cognome = st.text_input("Cognome *", key="reg_cognome_input")
+                    reg_cf = st.text_input("Codice Fiscale *", key="reg_cf_input")
+                    reg_password = st.text_input(
+                        "Scegli una Password *", type="password", key="reg_password_input"
+                    )
+                    reg_password_conferma = st.text_input(
+                        "Conferma Password *", type="password", key="reg_password_conferma_input"
+                    )
+                    submit_registrazione = st.form_submit_button("Crea Account")
+
+                    if submit_registrazione:
+                        if reg_password != reg_password_conferma:
+                            st.error("❌ Le due password inserite non coincidono.")
+                        else:
+                            successo, msg = registra_utente(
+                                reg_nome, reg_cognome, reg_cf, reg_password
+                            )
+                            if successo:
+                                st.success(msg)
+                            else:
+                                st.error(f"❌ {msg}")
+
+            st.stop()
+
         if logo_path:
             c1, c2, c3 = st.columns([1, 2, 1])
             with c2:
                 st.image(logo_path, use_container_width=True)
 
         st.title("Postura & Pilates")
-        st.write("**Dott.ssa Roberta Sinagra**")
+        col_saluto, col_logout = st.columns([3, 1])
+        with col_saluto:
+            st.write(
+                f"**Dott.ssa Roberta Sinagra** &nbsp;|&nbsp; Ciao, "
+                f"{st.session_state['utente_loggato']['nome']} 👋"
+            )
+        with col_logout:
+            if st.button("🚪 Esci"):
+                del st.session_state["utente_loggato"]
+                st.rerun()
 
         tab1, tab2, tab3, tab4 = st.tabs([
             "📅 Prenota",
@@ -849,9 +1014,6 @@ else:
             st.markdown("### Modulo di Prenotazione")
 
             if st.session_state.get("reset_form_flag", False):
-                st.session_state["nome_input"] = ""
-                st.session_state["cognome_input"] = ""
-                st.session_state["cf_input"] = ""
                 if "nome_2_input" in st.session_state:
                     st.session_state["nome_2_input"] = ""
                 if "cognome_2_input" in st.session_state:
@@ -901,13 +1063,15 @@ else:
                     st.rerun()
             else:
                 with st.container(border=True):
-                    col_n1, col_n2, col_n3 = st.columns([2, 2, 3])
-                    with col_n1:
-                        nome = st.text_input("Nome *", key="nome_input")
-                    with col_n2:
-                        cognome = st.text_input("Cognome *", key="cognome_input")
-                    with col_n3:
-                        codice_fiscale = st.text_input("Codice Fiscale *", key="cf_input")
+                    utente_loggato = st.session_state["utente_loggato"]
+                    nome = utente_loggato["nome"]
+                    cognome = utente_loggato["cognome"]
+                    codice_fiscale = utente_loggato["codice_fiscale"]
+
+                    st.info(
+                        f"📌 Stai prenotando come **{nome} {cognome}** "
+                        f"(CF: {codice_fiscale})"
+                    )
 
                     trattamento = st.selectbox(
                         "Seleziona Trattamento / Lezione *",
