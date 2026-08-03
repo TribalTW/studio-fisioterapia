@@ -178,7 +178,7 @@ st.markdown(
     }
     
     /* Stile delle Tab di navigazione - Uniforme e a capsula */
-    /* Sblocca i contenitori per evitare qualsiasi taglio superiore o lateral */
+    /* Sblocca i contenitori per evitare qualsiasi taglio superiore o laterale */
     .stTabs, .stTabs [data-baseweb="tab-list"], .stTabs div {
         overflow: visible !important;
     }
@@ -188,14 +188,14 @@ st.markdown(
         display: none !important;
     }
 
-    /* Stile base delle tab non selezionate con più spazio interno */
+    /* Tab non selezionate: più larghe ai lati ma snelle sopra/sotto */
     .stTabs [data-baseweb="tab"] {
         background-color: #fff0f5;
         border-radius: 40px !important;
         color: #880E4F;
         font-weight: 600;
-        padding: 14px 32px !important; /* Spazio maggiore attorno al testo */
-        font-size: 16px !important;     /* Testo leggermente più leggibile */
+        padding: 10px 48px !important; /* 10px sopra/sotto, 48px a destra/sinistra */
+        font-size: 16px !important;
         border: 1.5px solid #fca4c3 !important;
         transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
     }
@@ -205,7 +205,7 @@ st.markdown(
         transform: translateY(-2px);
     }
 
-    /* Tab selezionata in primo piano, più grande e spaziosa */
+    /* Tab selezionata in primo piano */
     .stTabs [aria-selected="true"] {
         background: linear-gradient(135deg, #fca4c3 0%, #e882a4) !important;
         color: #ffffff !important;
