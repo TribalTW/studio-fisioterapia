@@ -1173,7 +1173,7 @@ else:
             st.markdown(
                 """
                 <div class="box-info-carino">
-                    ✨ Accedi, Registrati o Recupera la tua password per gestire le tue lezioni in studio.
+                    ✨ Accedi o Registrati per prenotare la tua prossima lezione in pochi semplici click.
                 </div>
                 """,
                 unsafe_allow_html=True,
