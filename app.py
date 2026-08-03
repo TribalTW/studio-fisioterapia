@@ -222,6 +222,28 @@ END:VCALENDAR"""
     return ics_content
 
 
+# Pop-up modale (Dialog) per l'accettazione obbligatoria del regolamento
+@st.dialog("📜 Regolamento dello Studio - Termini di Servizio")
+def popup_regolamento():
+    st.markdown(
+        """
+        Prima di completare la prenotazione, ti invitiamo a leggere attentamente il regolamento dello studio:
+        
+        * ⏱️ **Durata Lezione:** La lezione dura 50 minuti.
+        * 🕒 **Puntualità:** Si raccomanda di presentarsi circa 5 minuti prima dell'orario della seduta.
+        * 🧦 **Abbigliamento e Calzini:** È obbligatorio l'uso di **calzini antiscivolo** durante tutte le lezioni.
+        * 🧴 **Asciugamano:** Si richiede di portare un proprio asciugamano personale.
+        * 📵 **Cellulari:** Modalità silenziosa consigliata.
+        * ⏱️ **Disdette:** Preavviso minimo di 24 ore.
+        """
+    )
+    st.markdown("---")
+    if st.button("✅ Ho letto e accetto il regolamento", use_container_width=True):
+        st.session_state["regolamento_accettato"] = True
+        st.session_state["mostra_dialog_regolamento"] = False
+        st.rerun()
+
+
 logo_path = None
 for possible_name in [
     "logo.png", "logo.PNG", "logo.jpg", "logo.jpeg", "logo.png.png",
@@ -781,6 +803,47 @@ else:
             "📜 Regolamento",
         ])
 
+        # Se il pop-up del regolamento deve essere aperto
+        if st.session_state.get("mostra_dialog_regolamento", False):
+            popup_regolamento()
+
+        # Se l'utente ha accettato il regolamento, finalizziamo la prenotazione in sospeso
+        if st.session_state.get("regolamento_accettato", False) and "pending_booking" in st.session_state:
+            pb = st.session_state["pending_booking"]
+            
+            conn = sqlite3.connect("prenotazioni.db")
+            c = conn.cursor()
+            data_creazione_str = get_current_time_local().strftime("%Y-%m-%d %H:%M")
+            c.execute(
+                "INSERT INTO prenotazioni (nome, data, ora, trattamento, data_creazione, device_id, stato_presenza, codice_fiscale, codice_fiscale_2) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    pb["nome_completo"],
+                    str(pb["data_scelta"]),
+                    pb["ora_scelta"],
+                    pb["trattamento"],
+                    data_creazione_str,
+                    pb["client_device_id"],
+                    "Assente",
+                    pb["cf_principale"],
+                    pb["cf_secondario"],
+                ),
+            )
+            conn.commit()
+            conn.close()
+
+            ics_string = genera_file_ics(pb["trattamento"], str(pb["data_scelta"]), pb["ora_scelta"])
+            data_formattata = pb["data_scelta"].strftime("%d/%m/%Y")
+            
+            st.session_state["booking_success_msg"] = (
+                f"🎉 PRENOTAZIONE CONFERMATA!\n\nGrazie {pb['nome']} {pb['cognome']}, ti aspetto il {data_formattata} alle ore {pb['ora_scelta']} per {pb['trattamento']}."
+            )
+            st.session_state["ics_data"] = ics_string
+            st.session_state["reset_form_flag"] = True
+            
+            del st.session_state["pending_booking"]
+            st.session_state["regolamento_accettato"] = False
+            st.rerun()
+
         # TAB 1: PRENOTAZIONE
         with tab1:
             st.markdown("### Modulo di Prenotazione")
@@ -956,7 +1019,6 @@ else:
                     submitted = st.button("Conferma Prenotazione")
 
                 if submitted:
-                    # Normalizzazione automatica: iniziali maiuscole per nomi/cognomi e tutto maiuscolo per i CF
                     nome = nome.strip().title()
                     cognome = cognome.strip().title()
                     codice_fiscale = codice_fiscale.strip().upper()
@@ -1055,32 +1117,20 @@ else:
                             st.error("⚠️ Spiacenti, questo orario è stato appena occupato! Riprova con un altro orario.")
                             conn.close()
                         else:
-                            data_creazione_str = get_current_time_local().strftime("%Y-%m-%d %H:%M")
-                            c.execute(
-                                "INSERT INTO prenotazioni (nome, data, ora, trattamento, data_creazione, device_id, stato_presenza, codice_fiscale, codice_fiscale_2) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                                (
-                                    nome_completo,
-                                    str(data_scelta),
-                                    ora_scelta,
-                                    trattamento,
-                                    data_creazione_str,
-                                    client_device_id,
-                                    "Assente",
-                                    cf_principale,
-                                    cf_secondario,
-                                ),
-                            )
-                            conn.commit()
+                            # Memorizziamo i dati in sospeso e attiviamo il pop-up del regolamento
+                            st.session_state["pending_booking"] = {
+                                "nome_completo": nome_completo,
+                                "data_scelta": data_scelta,
+                                "ora_scelta": ora_scelta,
+                                "trattamento": trattamento,
+                                "client_device_id": client_device_id,
+                                "cf_principale": cf_principale,
+                                "cf_secondario": cf_secondario,
+                                "nome": nome,
+                                "cognome": cognome
+                            }
+                            st.session_state["mostra_dialog_regolamento"] = True
                             conn.close()
-
-                            ics_string = genera_file_ics(trattamento, str(data_scelta), ora_scelta)
-
-                            data_formattata = data_scelta.strftime("%d/%m/%Y")
-                            st.session_state["booking_success_msg"] = (
-                                f"🎉 PRENOTAZIONE CONFERMATA!\n\nGrazie {nome.strip()} {cognome.strip()}, ti aspetto il {data_formattata} alle ore {ora_scelta} per {trattamento}."
-                            )
-                            st.session_state["ics_data"] = ics_string
-                            st.session_state["reset_form_flag"] = True
                             st.rerun()
 
         # TAB 2: INFO STUDIO
