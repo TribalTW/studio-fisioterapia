@@ -234,7 +234,7 @@ def popup_regolamento():
         * 🧦 **Abbigliamento e Calzini:** È obbligatorio l'uso di **calzini antiscivolo** durante tutte le lezioni.
         * 🧴 **Asciugamano:** Si richiede di portare un proprio asciugamano personale.
         * 📵 **Cellulari:** Modalità silenziosa consigliata.
-        * ⏱️ **Disdette:** Preavviso minimo di 24 ore.
+        * ⏱️ **Disdette:** Preavviso minimo di 24 ore, in caso contrario la lezione verrà comunque conteggiata.
         """
     )
     st.markdown("---")
