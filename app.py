@@ -64,9 +64,20 @@ st.markdown(
         white-space: nowrap !important;
     }
     
-    h1, h2, h3 {
+    h1, h2, h3, h4 {
         color: #880E4F !important;
         text-align: center;
+    }
+    
+    .box-info-carino {
+        background-color: #fff5f8 !important;
+        border: 1px solid #f3b6cc !important;
+        border-radius: 12px !important;
+        padding: 14px 18px !important;
+        margin-bottom: 18px !important;
+        text-align: center !important;
+        color: #880E4F !important;
+        font-size: 0.95rem !important;
     }
     
     .stCaption, p {
@@ -102,16 +113,50 @@ def calcola_iniziali_cf(cognome, nome):
     return cognome_cf, nome_cf
 
 
+# Tabelle ufficiali per il calcolo del carattere di controllo del Codice Fiscale
+_VALORI_DISPARI = {
+    "0": 1, "1": 0, "2": 5, "3": 7, "4": 9, "5": 13, "6": 15, "7": 17, "8": 19, "9": 21,
+    "A": 1, "B": 0, "C": 5, "D": 7, "E": 9, "F": 13, "G": 15, "H": 17, "I": 19, "J": 21,
+    "K": 2, "L": 4, "M": 18, "N": 20, "O": 11, "P": 3, "Q": 6, "R": 8, "S": 12, "T": 14,
+    "U": 16, "V": 10, "W": 22, "X": 25, "Y": 24, "Z": 23,
+}
+_VALORI_PARI = {
+    "0": 0, "1": 1, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9,
+    "A": 0, "B": 1, "C": 2, "D": 3, "E": 4, "F": 5, "G": 6, "H": 7, "I": 8, "J": 9,
+    "K": 10, "L": 11, "M": 12, "N": 13, "O": 14, "P": 15, "Q": 16, "R": 17, "S": 18, "T": 19,
+    "U": 20, "V": 21, "W": 22, "X": 23, "Y": 24, "Z": 25,
+}
+_LETTERE_RESTO = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+
+def calcola_carattere_controllo_cf(cf_15):
+    totale = 0
+    for i, carattere in enumerate(cf_15):
+        posizione = i + 1  # posizione 1-indicizzata
+        if posizione % 2 != 0:
+            totale += _VALORI_DISPARI[carattere]
+        else:
+            totale += _VALORI_PARI[carattere]
+    return _LETTERE_RESTO[totale % 26]
+
+
 def valida_codice_fiscale(nome, cognome, cf):
     cf = cf.strip().upper()
-    regex_cf = r"^[A-Z]{6}[0-9]{2}[A-E&H-L-N-P-R-V][0-9]{2}[A-Z][0-9]{3}[A-Z]$"
+    # Lettera del mese: A,B,C,D,E,H,L,M,P,R,S,T (i 12 mesi, in ordine gennaio->dicembre)
+    regex_cf = r"^[A-Z]{6}[0-9]{2}[ABCDEHLMPRST][0-9]{2}[A-Z][0-9]{3}[A-Z]$"
     if not re.match(regex_cf, cf):
         return False, "Il formato del Codice Fiscale non è valido (deve essere di 16 caratteri alfanumerici corretti)."
-    
-    cog_esperato, _ = calcola_iniziali_cf(cognome, nome)
+
+    cog_esperato, nome_esperato = calcola_iniziali_cf(cognome, nome)
     if cf[:3] != cog_esperato:
         return False, f"Le prime 3 lettere del Codice Fiscale non corrispondono al cognome inserito ({cognome})."
-    
+    if cf[3:6] != nome_esperato:
+        return False, f"Le lettere 4-6 del Codice Fiscale non corrispondono al nome inserito ({nome})."
+
+    carattere_atteso = calcola_carattere_controllo_cf(cf[:15])
+    if cf[15] != carattere_atteso:
+        return False, "Il Codice Fiscale inserito non è corretto (carattere di controllo non valido). Ricontrolla di averlo digitato correttamente."
+
     return True, ""
 
 
@@ -891,9 +936,14 @@ else:
             st.title("Postura & Pilates")
             st.write("**Dott.ssa Roberta Sinagra**")
             st.markdown("#### 👤 Accedi al tuo account o registrati")
-            st.write(
-                "Crea un account una sola volta: alle prossime visite ti basterà accedere "
-                "con nome, cognome e password, senza dover reinserire il Codice Fiscale ogni volta."
+            st.markdown(
+                """
+                <div class="box-info-carino">
+                    ✨ Crea un account una sola volta: alle prossime visite ti basterà accedere
+                    con nome, cognome e password, senza dover reinserire il Codice Fiscale ogni volta.
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
 
             tab_login, tab_registrazione = st.tabs(["🔑 Accedi", "📝 Registrati"])
@@ -950,16 +1000,15 @@ else:
                 st.image(logo_path, use_container_width=True)
 
         st.title("Postura & Pilates")
-        col_saluto, col_logout = st.columns([3, 1])
-        with col_saluto:
-            st.write(
-                f"**Dott.ssa Roberta Sinagra** &nbsp;|&nbsp; Ciao, "
-                f"{st.session_state['utente_loggato']['nome']} 👋"
-            )
-        with col_logout:
-            if st.button("🚪 Esci"):
-                del st.session_state["utente_loggato"]
-                st.rerun()
+        st.markdown(
+            f"""
+            <p style="text-align: center;">
+                <strong>Dott.ssa Roberta Sinagra</strong> &nbsp;|&nbsp; Ciao,
+                {st.session_state['utente_loggato']['nome']} 👋
+            </p>
+            """,
+            unsafe_allow_html=True,
+        )
 
         tab1, tab2, tab3, tab4 = st.tabs([
             "📅 Prenota",
@@ -1347,3 +1396,11 @@ else:
                 * 📵 **Cellulari:** Modalità silenziosa consigliata.
                 * ⏱️ **Disdette:** Preavviso minimo di 24 ore, in caso contrario la lezione verrà comunque conteggiata.
                 """)
+
+        # --- Footer: pulsante di logout, in basso a sinistra ---
+        st.markdown("<br>", unsafe_allow_html=True)
+        col_footer_1, col_footer_2 = st.columns([1, 3])
+        with col_footer_1:
+            if st.button("🚪 Esci", key="btn_logout_footer"):
+                del st.session_state["utente_loggato"]
+                st.rerun()
