@@ -782,6 +782,58 @@ if st.session_state["admin_logged_in"]:
         else:
             st.info("Nessun dispositivo in blacklist.")
 
+    with st.container(border=True):
+        st.subheader("👤 Gestione Account Registrati")
+        st.write(
+            "Qui trovi tutti gli account creati dai clienti (Nome, Cognome, Codice Fiscale). "
+            "Puoi eliminarne uno se richiesto (es. per errore, richiesta di cancellazione dati, o duplicato)."
+        )
+
+        conn = sqlite3.connect("prenotazioni.db")
+        df_utenti = pd.read_sql_query(
+            "SELECT id, nome, cognome, codice_fiscale, data_registrazione FROM utenti ORDER BY data_registrazione DESC",
+            conn,
+        )
+        conn.close()
+
+        if not df_utenti.empty:
+            st.dataframe(df_utenti, use_container_width=True)
+
+            df_utenti["label"] = (
+                df_utenti["id"].astype(str)
+                + " - "
+                + df_utenti["nome"]
+                + " "
+                + df_utenti["cognome"]
+                + " ("
+                + df_utenti["codice_fiscale"]
+                + ")"
+            )
+            scelta_utente_elimina = st.selectbox(
+                "Seleziona account da eliminare",
+                df_utenti["label"].tolist(),
+                key="seleziona_utente_elimina_input",
+            )
+            conferma_eliminazione = st.checkbox(
+                "Confermo di voler eliminare definitivamente questo account "
+                "(il cliente dovrà registrarsi di nuovo per prenotare)",
+                key="conferma_elimina_utente_checkbox",
+            )
+            if st.button("🗑️ Elimina Account Selezionato"):
+                if not conferma_eliminazione:
+                    st.error("Devi prima confermare la casella qui sopra per procedere con l'eliminazione.")
+                else:
+                    id_utente_da_eliminare = int(scelta_utente_elimina.split(" - ")[0])
+                    conn = sqlite3.connect("prenotazioni.db")
+                    c = conn.cursor()
+                    c.execute("DELETE FROM utenti WHERE id = ?", (id_utente_da_eliminare,))
+                    conn.commit()
+                    conn.close()
+                    st.success(f"Account #{id_utente_da_eliminare} eliminato con successo!")
+                    st.rerun()
+        else:
+            st.info("Nessun account cliente registrato al momento.")
+
 
 # --- VISTA 2: PAGINA PRINCIPALE CLIENTE ---
 else:
