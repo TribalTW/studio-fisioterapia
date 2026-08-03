@@ -9,8 +9,7 @@ import pandas as pd
 import psycopg2
 import streamlit as st
 import streamlit.components.v1 as components
-from sqlalchemy import create_engine
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 
 # Configurazione Pagina
 st.set_page_config(
@@ -19,17 +18,63 @@ st.set_page_config(
     layout="centered",
 )
 
-# Connessione a Supabase / PostgreSQL
+# Connessione a Supabase / PostgreSQL con caching delle risorse
 @st.cache_resource
 def get_db_engine():
     db_url = st.secrets["supabase"]["db_url"]
-    return create_engine(db_url)
-
-def get_db_connection():
-    db_url = st.secrets["supabase"]["db_url"]
-    return psycopg2.connect(db_url)
+    return create_engine(db_url, pool_pre_ping=True)
 
 engine = get_db_engine()
+
+# Inizializzazione Database PostgreSQL / Supabase (Eseguita una sola volta)
+@st.cache_resource
+def init_db():
+    with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS prenotazioni (
+                id SERIAL PRIMARY KEY,
+                nome TEXT NOT NULL,
+                data TEXT NOT NULL,
+                ora TEXT NOT NULL,
+                trattamento TEXT NOT NULL,
+                data_creazione TEXT NOT NULL,
+                device_id TEXT,
+                stato_presenza TEXT DEFAULT 'Assente',
+                codice_fiscale TEXT,
+                codice_fiscale_2 TEXT
+            )
+        """))
+        
+        for col, col_type in [
+            ("device_id", "TEXT"),
+            ("stato_presenza", "TEXT DEFAULT 'Assente'"),
+            ("codice_fiscale", "TEXT"),
+            ("codice_fiscale_2", "TEXT")
+        ]:
+            try:
+                conn.execute(text(f"ALTER TABLE prenotazioni ADD COLUMN IF NOT EXISTS {col} {col_type}"))
+            except Exception:
+                pass
+
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS banned_devices (
+                device_id TEXT PRIMARY KEY
+            )
+        """))
+
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS utenti (
+                id SERIAL PRIMARY KEY,
+                nome TEXT NOT NULL,
+                cognome TEXT NOT NULL,
+                codice_fiscale TEXT NOT NULL UNIQUE,
+                password_salt TEXT NOT NULL,
+                password_hash TEXT NOT NULL,
+                data_registrazione TEXT NOT NULL
+            )
+        """))
+
+init_db()
 
 # Stile CSS della pagina
 st.markdown(
@@ -189,14 +234,11 @@ def verifica_password(password, salt, pwd_hash_atteso):
 
 
 def registra_utente(nome, cognome, cf, password):
-    # Generazione hash e salt (come già fai)
     salt, pwd_hash = hash_password(password)
     data_reg = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     try:
-        # Usa il pool di SQLAlchemy: velocissimo!
         with engine.begin() as conn:
-            # Controlla se esiste già
             res = conn.execute(
                 text("SELECT id FROM utenti WHERE codice_fiscale = :cf"),
                 {"cf": cf.upper()}
@@ -205,7 +247,6 @@ def registra_utente(nome, cognome, cf, password):
             if res:
                 return False, "Esiste già un utente registrato con questo Codice Fiscale."
             
-            # Inserisce il nuovo utente
             conn.execute(
                 text("""
                     INSERT INTO utenti (nome, cognome, codice_fiscale, password_salt, password_hash, data_registrazione) 
@@ -242,8 +283,7 @@ def login_utente(nome, cognome, password):
                 
             uid, u_nome, u_cognome, u_cf, salt, pwd_hash = res
             
-            # Verifica la password
-            if verify_password(password, salt, pwd_hash):
+            if verifica_password(password, salt, pwd_hash):
                 return {
                     "id": uid,
                     "nome": u_nome,
@@ -254,63 +294,6 @@ def login_utente(nome, cognome, password):
                 return None, "Password errata."
     except Exception as e:
         return None, str(e)
-
-
-# Inizializzazione Database PostgreSQL / Supabase
-def init_db():
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS prenotazioni (
-            id SERIAL PRIMARY KEY,
-            nome TEXT NOT NULL,
-            data TEXT NOT NULL,
-            ora TEXT NOT NULL,
-            trattamento TEXT NOT NULL,
-            data_creazione TEXT NOT NULL,
-            device_id TEXT,
-            stato_presenza TEXT DEFAULT 'Assente',
-            codice_fiscale TEXT,
-            codice_fiscale_2 TEXT
-        )
-    """)
-    conn.commit()
-    
-    for col, col_type in [
-        ("device_id", "TEXT"),
-        ("stato_presenza", "TEXT DEFAULT 'Assente'"),
-        ("codice_fiscale", "TEXT"),
-        ("codice_fiscale_2", "TEXT")
-    ]:
-        try:
-            c.execute(f"ALTER TABLE prenotazioni ADD COLUMN IF NOT EXISTS {col} {col_type}")
-            conn.commit()
-        except Exception:
-            conn.rollback()
-
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS banned_devices (
-            device_id TEXT PRIMARY KEY
-        )
-    """)
-    conn.commit()
-
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS utenti (
-            id SERIAL PRIMARY KEY,
-            nome TEXT NOT NULL,
-            cognome TEXT NOT NULL,
-            codice_fiscale TEXT NOT NULL UNIQUE,
-            password_salt TEXT NOT NULL,
-            password_hash TEXT NOT NULL,
-            data_registrazione TEXT NOT NULL
-        )
-    """)
-    conn.commit()
-    conn.close()
-
-
-init_db()
 
 
 def get_orari_per_data(data):
@@ -351,7 +334,6 @@ def get_current_time_local():
         return datetime.now()
 
 
-# Funzione per generare il file ICS universale
 def genera_file_ics(nome_trattamento, data_str, ora_str):
     dt_inizio = datetime.strptime(f"{data_str} {ora_str}", "%Y-%m-%d %H:%M")
     dt_fine = dt_inizio + timedelta(minutes=50)
@@ -380,7 +362,6 @@ END:VCALENDAR"""
     return ics_content
 
 
-# Pop-up modale (Dialog) per l'accettazione obbligatoria del regolamento
 @st.dialog("📜 Regolamento dello Studio - Termini di Servizio")
 def popup_regolamento():
     st.markdown(
@@ -451,7 +432,7 @@ if st.session_state["admin_logged_in"]:
     with st.container(border=True):
         st.subheader("📋 Elenco Prenotazioni & Codici Fiscali")
         df = pd.read_sql_query(
-            "SELECT id, email, codice_fiscale, codice_fiscale_2, data, ora, tipo AS trattamento, stato_presenza, device_id FROM prenotazioni ORDER BY data DESC, ora ASC",
+            "SELECT id, codice_fiscale, codice_fiscale_2, data, ora, trattamento, stato_presenza, device_id FROM prenotazioni ORDER BY data DESC, ora ASC",
             engine,
         )
 
@@ -472,14 +453,11 @@ if st.session_state["admin_logged_in"]:
         )
         data_presenze_str = str(data_presenze)
 
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute(
-            "SELECT id, nome, trattamento, ora, stato_presenza FROM prenotazioni WHERE data = %s AND device_id != 'SYSTEM' ORDER BY ora ASC",
-            (data_presenze_str,),
-        )
-        appuntamenti_giorno = c.fetchall()
-        conn.close()
+        with engine.begin() as conn:
+            appuntamenti_giorno = conn.execute(
+                text("SELECT id, nome, trattamento, ora, stato_presenza FROM prenotazioni WHERE data = :data AND device_id != 'SYSTEM' ORDER BY ora ASC"),
+                {"data": data_presenze_str}
+            ).fetchall()
 
         if appuntamenti_giorno:
             with st.form("form_presenze"):
@@ -528,7 +506,6 @@ if st.session_state["admin_logged_in"]:
                     "💾 Salva Presenze & Genera Codici"
                 )
                 if submit_presenze:
-                    # Utilizziamo SQLAlchemy in modo rapido e sicuro con engine.begin()
                     with engine.begin() as conn:
                         for app_id, nuovo_stato in presenze_dict.items():
                             conn.execute(
@@ -643,58 +620,55 @@ if st.session_state["admin_logged_in"]:
             else:
                 lista_date = [str(data_intervallo)]
 
-            conn = get_db_connection()
-            c = conn.cursor()
             ora_attuale_str = get_current_time_local().strftime("%Y-%m-%d %H:%M")
 
-            if btn_blocca:
-                for d_str in lista_date:
-                    if modo_intervallo == "Tutta la giornata":
-                        orari_giorno = get_orari_per_data(d_str)
-                        for h in orari_giorno:
-                            c.execute(
-                                "SELECT id FROM prenotazioni WHERE data = %s AND ora = %s",
-                                (d_str, h),
-                            )
-                            if not c.fetchone():
-                                c.execute(
-                                    "INSERT INTO prenotazioni (nome, data, ora, trattamento, data_creazione, device_id, stato_presenza) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                                    (
-                                        "🔒 STUDIO CHIUSO", d_str, h,
-                                        "Chiusura Admin",
-                                        ora_attuale_str, "SYSTEM", "Chiuso",
-                                    ),
+            with engine.begin() as conn:
+                if btn_blocca:
+                    for d_str in lista_date:
+                        if modo_intervallo == "Tutta la giornata":
+                            orari_giorno = get_orari_per_data(d_str)
+                            for h in orari_giorno:
+                                res = conn.execute(
+                                    text("SELECT id FROM prenotazioni WHERE data = :d AND ora = :h"),
+                                    {"d": d_str, "h": h}
+                                ).fetchone()
+                                if not res:
+                                    conn.execute(
+                                        text("INSERT INTO prenotazioni (nome, data, ora, trattamento, data_creazione, device_id, stato_presenza) VALUES (:n, :d, :o, :t, :dc, :di, :sp)"),
+                                        {
+                                            "n": "🔒 STUDIO CHIUSO", "d": d_str, "o": h,
+                                            "t": "Chiusura Admin", "dc": ora_attuale_str,
+                                            "di": "SYSTEM", "sp": "Chiuso"
+                                        }
+                                    )
+                        else:
+                            res = conn.execute(
+                                text("SELECT id FROM prenotazioni WHERE data = :d AND ora = :o"),
+                                {"d": d_str, "o": ora_intervallo}
+                            ).fetchone()
+                            if not res:
+                                conn.execute(
+                                    text("INSERT INTO prenotazioni (nome, data, ora, trattamento, data_creazione, device_id, stato_presenza) VALUES (:n, :d, :o, :t, :dc, :di, :sp)"),
+                                    {
+                                        "n": "🔒 ORARIO CHIUSO", "d": d_str, "o": ora_intervallo,
+                                        "t": "Chiusura Admin", "dc": ora_attuale_str,
+                                        "di": "SYSTEM", "sp": "Chiuso"
+                                    }
                                 )
-                    else:
-                        c.execute(
-                            "SELECT id FROM prenotazioni WHERE data = %s AND ora = %s",
-                            (d_str, ora_intervallo),
-                        )
-                        if not c.fetchone():
-                            c.execute(
-                                "INSERT INTO prenotazioni (nome, data, ora, trattamento, data_creazione, device_id, stato_presenza) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                                (
-                                    "🔒 ORARIO CHIUSO", d_str, ora_intervallo,
-                                    "Chiusura Admin",
-                                    ora_attuale_str, "SYSTEM", "Chiuso",
-                                ),
-                            )
-                st.success("Blocco applicato con successo!")
+                    st.success("Blocco applicato con successo!")
 
-            elif btn_sblocca:
-                for d_str in lista_date:
-                    if modo_intervallo == "Tutta la giornata":
-                        c.execute("DELETE FROM prenotazioni WHERE data = %s", (d_str,))
-                    else:
-                        if ora_intervallo:
-                            c.execute(
-                                "DELETE FROM prenotazioni WHERE data = %s AND ora = %s",
-                                (d_str, ora_intervallo),
-                            )
-                st.success("Sblocco applicato con successo!")
+                elif btn_sblocca:
+                    for d_str in lista_date:
+                        if modo_intervallo == "Tutta la giornata":
+                            conn.execute(text("DELETE FROM prenotazioni WHERE data = :d"), {"d": d_str})
+                        else:
+                            if ora_intervallo:
+                                conn.execute(
+                                    text("DELETE FROM prenotazioni WHERE data = :d AND ora = :o"),
+                                    {"d": d_str, "o": ora_intervallo}
+                                )
+                    st.success("Sblocco applicato con successo!")
 
-            conn.commit()
-            conn.close()
             st.rerun()
 
     with st.container(border=True):
@@ -709,11 +683,8 @@ if st.session_state["admin_logged_in"]:
             )
             if st.button("Elimina Singola Prenotazione"):
                 if id_da_eliminare > 0:
-                    conn = get_db_connection()
-                    c = conn.cursor()
-                    c.execute("DELETE FROM prenotazioni WHERE id = %s", (id_da_eliminare,))
-                    conn.commit()
-                    conn.close()
+                    with engine.begin() as conn:
+                        conn.execute(text("DELETE FROM prenotazioni WHERE id = :id"), {"id": id_da_eliminare})
                     st.success(f"Prenotazione #{id_da_eliminare} eliminata!")
                     st.rerun()
 
@@ -740,22 +711,18 @@ if st.session_state["admin_logged_in"]:
                 )
                 if st.button("Banna Utente Selezionato"):
                     id_selezionato = int(scelta_ban.split(" - ")[0])
-                    conn = get_db_connection()
-                    c = conn.cursor()
-                    c.execute(
-                        "SELECT device_id FROM prenotazioni WHERE id = %s",
-                        (id_selezionato,),
-                    )
-                    res = c.fetchone()
-                    if res and res[0]:
-                        dev_id_da_bannare = res[0]
-                        c.execute(
-                            "INSERT INTO banned_devices (device_id) VALUES (%s) ON CONFLICT (device_id) DO NOTHING",
-                            (dev_id_da_bannare,),
-                        )
-                        conn.commit()
-                        st.success(f"Utente bannato con successo!")
-                    conn.close()
+                    with engine.begin() as conn:
+                        res = conn.execute(
+                            text("SELECT device_id FROM prenotazioni WHERE id = :id"),
+                            {"id": id_selezionato}
+                        ).fetchone()
+                        if res and res[0]:
+                            dev_id_da_bannare = res[0]
+                            conn.execute(
+                                text("INSERT INTO banned_devices (device_id) VALUES (:dev_id) ON CONFLICT (device_id) DO NOTHING"),
+                                {"dev_id": dev_id_da_bannare}
+                            )
+                            st.success("Utente bannato con successo!")
                     st.rerun()
             else:
                 st.info("Nessuna prenotazione disponibile.")
@@ -780,13 +747,11 @@ if st.session_state["admin_logged_in"]:
                 key="sbianca_device",
             )
             if st.button("Rimuovi Ban (Sbanna)"):
-                conn = get_db_connection()
-                c = conn.cursor()
-                c.execute(
-                    "DELETE FROM banned_devices WHERE device_id = %s", (dev_da_sbannare,)
-                )
-                conn.commit()
-                conn.close()
+                with engine.begin() as conn:
+                    conn.execute(
+                        text("DELETE FROM banned_devices WHERE device_id = :dev_id"),
+                        {"dev_id": dev_da_sbannare}
+                    )
                 st.success("Dispositivo rimosso dalla blacklist!")
                 st.rerun()
         else:
@@ -831,11 +796,11 @@ if st.session_state["admin_logged_in"]:
                     st.error("Devi prima confermare la casella qui sopra per procedere con l'eliminazione.")
                 else:
                     id_utente_da_eliminare = int(scelta_utente_elimina.split(" - ")[0])
-                    conn = get_db_connection()
-                    c = conn.cursor()
-                    c.execute("DELETE FROM utenti WHERE id = %s", (id_utente_da_eliminare,))
-                    conn.commit()
-                    conn.close()
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text("DELETE FROM utenti WHERE id = :id"),
+                            {"id": id_utente_da_eliminare}
+                        )
                     st.success(f"Account #{id_utente_da_eliminare} eliminato con successo!")
                     st.rerun()
         else:
@@ -845,14 +810,12 @@ if st.session_state["admin_logged_in"]:
 # --- VISTA 2: PAGINA PRINCIPALE CLIENTE ---
 else:
     client_device_id = get_client_device_id()
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute(
-        "SELECT device_id FROM banned_devices WHERE device_id = %s",
-        (client_device_id,),
-    )
-    is_banned = c.fetchone()
-    conn.close()
+    
+    with engine.begin() as conn:
+        is_banned = conn.execute(
+            text("SELECT device_id FROM banned_devices WHERE device_id = :dev_id"),
+            {"dev_id": client_device_id}
+        ).fetchone()
 
     if is_banned:
         if logo_path:
@@ -892,7 +855,6 @@ else:
                     )
             else:
                 with st.container(border=True):
-                    # Controlla se l'utente è già loggato nella sessione principale
                     utente_già_loggato = st.session_state.get("utente_loggato", None)
 
                     if utente_già_loggato:
@@ -905,20 +867,17 @@ else:
                             if submit_checkin_veloce:
                                 cf_utente = utente_già_loggato["codice_fiscale"]
 
-                                conn = get_db_connection()
-                                c = conn.cursor()
-                                c.execute(
-                                    """
-                                    SELECT id, nome, trattamento, ora, stato_presenza 
-                                    FROM prenotazioni 
-                                    WHERE data = %s 
-                                      AND device_id != 'SYSTEM' 
-                                      AND (UPPER(codice_fiscale) = %s OR UPPER(codice_fiscale_2) = %s)
-                                    """,
-                                    (oggi_str, cf_utente, cf_utente),
-                                )
-                                appuntamenti_trovati = c.fetchall()
-                                conn.close()
+                                with engine.begin() as conn:
+                                    appuntamenti_trovati = conn.execute(
+                                        text("""
+                                            SELECT id, nome, trattamento, ora, stato_presenza 
+                                            FROM prenotazioni 
+                                            WHERE data = :data 
+                                              AND device_id != 'SYSTEM' 
+                                              AND (UPPER(codice_fiscale) = :cf OR UPPER(codice_fiscale_2) = :cf)
+                                        """),
+                                        {"data": oggi_str, "cf": cf_utente}
+                                    ).fetchall()
 
                                 if not appuntamenti_trovati:
                                     st.error("❌ Nessuna prenotazione trovata a tuo nome per oggi.")
@@ -956,14 +915,11 @@ else:
                                             appuntamento_valido
                                         )
 
-                                        conn = get_db_connection()
-                                        c = conn.cursor()
-                                        c.execute(
-                                            "UPDATE prenotazioni SET stato_presenza = 'Presente' WHERE id = %s",
-                                            (p_id,),
-                                        )
-                                        conn.commit()
-                                        conn.close()
+                                        with engine.begin() as conn:
+                                            conn.execute(
+                                                text("UPDATE prenotazioni SET stato_presenza = 'Presente' WHERE id = :pid"),
+                                                {"pid": p_id}
+                                            )
 
                                         st.session_state["checkin_successo"] = (
                                             p_id, p_nome, p_tratt, p_ora, oggi_str,
@@ -974,7 +930,6 @@ else:
                                             "⏳ Il check-in è consentito solo nell'orario prossimo al tuo appuntamento."
                                         )
                     else:
-                        # Se non è loggato, mostra il form con la richiesta password
                         st.markdown(
                             "**Benvenuto/a in studio! 🧘‍♀️ Inserisci i dati del tuo account per confermare l'arrivo:**"
                         )
@@ -1002,20 +957,17 @@ else:
                                     else:
                                         cf_utente = utente_verificato["codice_fiscale"]
 
-                                        conn = get_db_connection()
-                                        c = conn.cursor()
-                                        c.execute(
-                                            """
-                                            SELECT id, nome, trattamento, ora, stato_presenza 
-                                            FROM prenotazioni 
-                                            WHERE data = %s 
-                                              AND device_id != 'SYSTEM' 
-                                              AND (UPPER(codice_fiscale) = %s OR UPPER(codice_fiscale_2) = %s)
-                                            """,
-                                            (oggi_str, cf_utente, cf_utente),
-                                        )
-                                        appuntamenti_trovati = c.fetchall()
-                                        conn.close()
+                                        with engine.begin() as conn:
+                                            appuntamenti_trovati = conn.execute(
+                                                text("""
+                                                    SELECT id, nome, trattamento, ora, stato_presenza 
+                                                    FROM prenotazioni 
+                                                    WHERE data = :data 
+                                                      AND device_id != 'SYSTEM' 
+                                                      AND (UPPER(codice_fiscale) = :cf OR UPPER(codice_fiscale_2) = :cf)
+                                                """),
+                                                {"data": oggi_str, "cf": cf_utente}
+                                            ).fetchall()
 
                                         if not appuntamenti_trovati:
                                             st.error("❌ Nessuna prenotazione trovata a tuo nome per oggi.")
@@ -1053,14 +1005,11 @@ else:
                                                     appuntamento_valido
                                                 )
 
-                                                conn = get_db_connection()
-                                                c = conn.cursor()
-                                                c.execute(
-                                                    "UPDATE prenotazioni SET stato_presenza = 'Presente' WHERE id = %s",
-                                                    (p_id,),
-                                                )
-                                                conn.commit()
-                                                conn.close()
+                                                with engine.begin() as conn:
+                                                    conn.execute(
+                                                        text("UPDATE prenotazioni SET stato_presenza = 'Presente' WHERE id = :pid"),
+                                                        {"pid": p_id}
+                                                    )
 
                                                 st.session_state["checkin_successo"] = (
                                                     p_id, p_nome, p_tratt, p_ora, oggi_str,
@@ -1177,25 +1126,22 @@ else:
         if st.session_state.get("regolamento_accettato", False) and "pending_booking" in st.session_state:
             pb = st.session_state["pending_booking"]
             
-            conn = get_db_connection()
-            c = conn.cursor()
             data_creazione_str = get_current_time_local().strftime("%Y-%m-%d %H:%M")
-            c.execute(
-                "INSERT INTO prenotazioni (nome, data, ora, trattamento, data_creazione, device_id, stato_presenza, codice_fiscale, codice_fiscale_2) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                (
-                    pb["nome_completo"],
-                    str(pb["data_scelta"]),
-                    pb["ora_scelta"],
-                    pb["trattamento"],
-                    data_creazione_str,
-                    pb["client_device_id"],
-                    "Assente",
-                    pb["cf_principale"],
-                    pb["cf_secondario"],
-                ),
-            )
-            conn.commit()
-            conn.close()
+            with engine.begin() as conn:
+                conn.execute(
+                    text("INSERT INTO prenotazioni (nome, data, ora, trattamento, data_creazione, device_id, stato_presenza, codice_fiscale, codice_fiscale_2) VALUES (:n, :d, :o, :t, :dc, :di, :sp, :cf1, :cf2)"),
+                    {
+                        "n": pb["nome_completo"],
+                        "d": str(pb["data_scelta"]),
+                        "o": pb["ora_scelta"],
+                        "t": pb["trattamento"],
+                        "dc": data_creazione_str,
+                        "di": pb["client_device_id"],
+                        "sp": "Assente",
+                        "cf1": pb["cf_principale"],
+                        "cf2": pb["cf_secondario"],
+                    }
+                )
 
             ics_string = genera_file_ics(pb["trattamento"], str(pb["data_scelta"]), pb["ora_scelta"])
             data_formattata = pb["data_scelta"].strftime("%d/%m/%Y")
@@ -1306,14 +1252,11 @@ else:
                             "Seleziona Data *", min_value=datetime.today(), key="data_input"
                         )
 
-                    conn = get_db_connection()
-                    c = conn.cursor()
-                    c.execute(
-                        "SELECT ora, trattamento, codice_fiscale, codice_fiscale_2, device_id FROM prenotazioni WHERE data = %s",
-                        (str(data_scelta),),
-                    )
-                    prenotazioni_giorno = c.fetchall()
-                    conn.close()
+                    with engine.begin() as conn:
+                        prenotazioni_giorno = conn.execute(
+                            text("SELECT ora, trattamento, codice_fiscale, codice_fiscale_2, device_id FROM prenotazioni WHERE data = :d"),
+                            {"d": str(data_scelta)}
+                        ).fetchall()
 
                     TUTTI_GLI_ORARI = get_orari_per_data(data_scelta)
                     current_datetime = get_current_time_local()
@@ -1393,14 +1336,11 @@ else:
                         cognome_2 = cognome_2.strip().title()
                         codice_fiscale_2 = codice_fiscale_2.strip().upper()
 
-                    conn_check = get_db_connection()
-                    c_check = conn_check.cursor()
-                    c_check.execute(
-                        "SELECT device_id FROM banned_devices WHERE device_id = %s",
-                        (client_device_id,),
-                    )
-                    is_banned_now = c_check.fetchone()
-                    conn_check.close()
+                    with engine.begin() as conn_check:
+                        is_banned_now = conn_check.execute(
+                            text("SELECT device_id FROM banned_devices WHERE device_id = :di"),
+                            {"di": client_device_id}
+                        ).fetchone()
 
                     cf_valido, cf_msg = valida_codice_fiscale(nome, cognome, codice_fiscale)
                     
@@ -1412,21 +1352,18 @@ else:
                     cf_principale = codice_fiscale.strip().upper()
                     cf_secondario = codice_fiscale_2.strip().upper() if trattamento == "Pilates Duetto (in coppia)" else None
 
-                    conn_dupl = get_db_connection()
-                    c_dupl = conn_dupl.cursor()
-                    c_dupl.execute(
-                        """SELECT id FROM prenotazioni 
-                           WHERE data = %s AND ora = %s 
-                             AND (device_id = %s OR UPPER(codice_fiscale) = %s OR UPPER(codice_fiscale_2) = %s 
-                                  OR (%s IS NOT NULL AND (UPPER(codice_fiscale) = %s OR UPPER(codice_fiscale_2) = %s)))""",
-                        (
-                            str(data_scelta), ora_scelta, 
-                            client_device_id, cf_principale, cf_principale,
-                            cf_secondario, cf_secondario, cf_secondario
-                        )
-                    )
-                    gia_presente = c_dupl.fetchone()
-                    conn_dupl.close()
+                    with engine.begin() as conn_dupl:
+                        gia_presente = conn_dupl.execute(
+                            text("""SELECT id FROM prenotazioni 
+                                   WHERE data = :d AND ora = :o 
+                                     AND (device_id = :di OR UPPER(codice_fiscale) = :cfp OR UPPER(codice_fiscale_2) = :cfp 
+                                          OR (:cfs IS NOT NULL AND (UPPER(codice_fiscale) = :cfs OR UPPER(codice_fiscale_2) = :cfs)))"""),
+                            {
+                                "d": str(data_scelta), "o": ora_scelta, 
+                                "di": client_device_id, "cfp": cf_principale,
+                                "cfs": cf_secondario
+                            }
+                        ).fetchone()
 
                     if is_banned_now:
                         st.error("⛔ Spiacenti, questo dispositivo è stato bloccato.")
@@ -1448,13 +1385,11 @@ else:
                         else:
                             nome_completo = f"{nome.strip()} {cognome.strip()}"
 
-                        conn = get_db_connection()
-                        c = conn.cursor()
-                        c.execute(
-                            "SELECT trattamento FROM prenotazioni WHERE data = %s AND ora = %s",
-                            (str(data_scelta), ora_scelta),
-                        )
-                        esistenti = c.fetchall()
+                        with engine.begin() as conn:
+                            esistenti = conn.execute(
+                                text("SELECT trattamento FROM prenotazioni WHERE data = :d AND ora = :o"),
+                                {"d": str(data_scelta), "o": ora_scelta}
+                            ).fetchall()
 
                         slot_occupato = False
                         posti_occupati = 0
@@ -1480,7 +1415,6 @@ else:
 
                         if impossibile_prenotare:
                             st.error("⚠️ Spiacenti, questo orario è stato appena occupato! Riprova con un altro orario.")
-                            conn.close()
                         else:
                             st.session_state["pending_booking"] = {
                                 "nome_completo": nome_completo,
@@ -1494,7 +1428,6 @@ else:
                                 "cognome": cognome
                             }
                             st.session_state["mostra_dialog_regolamento"] = True
-                            conn.close()
                             st.rerun()
 
         # TAB 2: INFO STUDIO
@@ -1545,7 +1478,7 @@ else:
                 * 🧦 **Abbigliamento e Calzini:** È obbligatorio l'uso di **calzini antiscivolo** durante tutte le lezioni.
                 * 🧴 **Asciugamano:** Si richiede di portare un proprio asciugamano personale.
                 * 📵 **Cellulari:** Modalità silenziosa consigliata.
-                * ⏱️ **Disdette:** Preavviso minimo di 24 ore, in caso contrario la lezione verrà comunque conteggiata.
+                * ⏱️ **Disdette:** Preavviso minimo di 24 ore, in contrario la lezione verrà comunque conteggiata.
                 """)
 
         # --- Footer: pulsante di logout, in basso a sinistra ---
