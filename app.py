@@ -7,9 +7,9 @@ import uuid
 from zoneinfo import ZoneInfo
 import pandas as pd
 import psycopg2
-import psycopg2.extras
 import streamlit as st
 import streamlit.components.v1 as components
+from sqlalchemy import create_engine
 
 # Configurazione Pagina
 st.set_page_config(
@@ -18,62 +18,56 @@ st.set_page_config(
     layout="centered",
 )
 
-# Stile CSS Avanzato con Bottoni ad Alta Leggibilità (Testo Bianco Forzato ovunque, inclusa la Sidebar)
+# Connessione a Supabase / PostgreSQL
+@st.cache_resource
+def get_db_engine():
+    db_url = st.secrets["supabase"]["db_url"]
+    return create_engine(db_url)
+
+def get_db_connection():
+    db_url = st.secrets["supabase"]["db_url"]
+    return psycopg2.connect(db_url)
+
+engine = get_db_engine()
+
+# Stile CSS della pagina
 st.markdown(
     """
     <style>
-    /* Stile generale e container */
     div.stVerticalBlockBorderWrapper, div[data-testid="stVerticalBlockBorderWrapper"] {
-        background-color: #fff9fc !important;
-        border: 1px solid #f3b6cc !important;
+        background-color: #fca4c3 !important;
+        border: 1px solid #e882a4 !important;
         border-radius: 16px !important;
-        padding: 24px !important;
-        box-shadow: 0 4px 20px rgba(216, 27, 96, 0.05);
+        padding: 20px !important;
     }
     
     div[data-testid="stVerticalBlockBorderWrapper"] div {
         background-color: transparent !important;
     }
     
-    /* Input di testo, select e date */
     .stTextInput input, .stSelectbox > div > div, .stDateInput input, .stNumberInput input {
         background-color: #FFFFFF !important;
-        border-radius: 10px !important;
-        border: 1px solid #e0cbd3 !important;
-        padding: 10px 14px !important;
-        color: #4a1525 !important;
+        border-radius: 8px !important;
+        border: 1px solid #E0E0E0 !important;
     }
     
-    .stTextInput input:focus, .stSelectbox > div > div:focus-within {
-        border-color: #D81B60 !important;
-        box-shadow: 0 0 0 2px rgba(216, 27, 96, 0.15) !important;
-    }
-    
-    /* Pulsanti principali e Sidebar - Testo bianco brillante, leggibile e ben contrastato */
-    div.stButton > button, div.stDownloadButton > button, section[data-testid="stSidebar"] div.stButton > button {
-        background: linear-gradient(135deg, #E91E63 0%, #C2185B 100%) !important;
-        color: #FFFFFF !important;
-        -webkit-text-fill-color: #FFFFFF !important;
+    div.stButton > button, div.stDownloadButton > button {
+        background-color: #D81B60 !important;
+        color: white !important;
         border-radius: 12px !important;
-        font-size: 1.05rem !important;
-        font-weight: 700 !important;
+        font-size: 1.1rem !important;
+        font-weight: bold !important;
         border: none !important;
         width: 100% !important;
         padding: 12px 20px !important;
-        margin-top: 8px !important;
+        margin-top: 5px !important;
         text-align: center !important;
         display: block !important;
-        box-shadow: 0 4px 12px rgba(216, 27, 96, 0.3);
-        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-        transition: all 0.3s ease;
     }
     
-    div.stButton > button:hover, div.stDownloadButton > button:hover, section[data-testid="stSidebar"] div.stButton > button:hover {
-        background: linear-gradient(135deg, #D81B60 0%, #AD1457 100%) !important;
-        box-shadow: 0 6px 16px rgba(216, 27, 96, 0.4);
-        transform: translateY(-1px);
-        color: #FFFFFF !important;
-        -webkit-text-fill-color: #FFFFFF !important;
+    div.stButton > button:hover, div.stDownloadButton > button:hover {
+        background-color: #C2185B !important;
+        color: white !important;
     }
     
     div[data-testid="stColumn"] div.stButton > button.btn-aggiorna {
@@ -83,36 +77,24 @@ st.markdown(
         white-space: nowrap !important;
     }
     
-    /* Tipografia e Titoli */
     h1, h2, h3, h4 {
         color: #880E4F !important;
-        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-        font-weight: 700;
-        letter-spacing: -0.5px;
-    }
-    
-    h1 {
         text-align: center;
-        font-size: 2.2rem !important;
-        margin-bottom: 0.2rem !important;
     }
     
-    /* Box informativi personalizzati */
     .box-info-carino {
-        background: linear-gradient(135deg, #fff0f5 100%, #ffe4ee 0%);
+        background-color: #fff5f8 !important;
         border: 1px solid #f3b6cc !important;
-        border-radius: 14px !important;
-        padding: 16px 20px !important;
-        margin-bottom: 20px !important;
+        border-radius: 12px !important;
+        padding: 14px 18px !important;
+        margin-bottom: 18px !important;
         text-align: center !important;
         color: #880E4F !important;
-        font-size: 0.98rem !important;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+        font-size: 0.95rem !important;
     }
     
     .stCaption, p {
         text-align: center;
-        color: #555555;
     }
     
     #MainMenu {visibility: hidden;}
@@ -121,76 +103,6 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
-
-
-# --- Connessione Supabase & Helper Database ---
-def get_db_connection():
-    db_url = st.secrets["postgres"]["connection_string"]
-    conn = psycopg2.connect(db_url)
-    return conn
-
-
-def load_df(query, params=None):
-    conn = get_db_connection()
-    try:
-        df = pd.read_sql_query(query, conn, params=params)
-    finally:
-        conn.close()
-    return df
-
-
-# Inizializzazione Tabelle su Supabase
-def init_db():
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS prenotazioni (
-            id SERIAL PRIMARY KEY,
-            nome TEXT NOT NULL,
-            data TEXT NOT NULL,
-            ora TEXT NOT NULL,
-            trattamento TEXT NOT NULL,
-            data_creazione TEXT NOT NULL,
-            device_id TEXT,
-            stato_presenza TEXT DEFAULT 'Assente',
-            codice_fiscale TEXT,
-            codice_fiscale_2 TEXT
-        )
-    """)
-    
-    for col, col_type in [
-        ("device_id", "TEXT"),
-        ("stato_presenza", "TEXT DEFAULT 'Assente'"),
-        ("codice_fiscale", "TEXT"),
-        ("codice_fiscale_2", "TEXT")
-    ]:
-        try:
-            c.execute(f"ALTER TABLE prenotazioni ADD COLUMN IF NOT EXISTS {col} {col_type}")
-        except Exception:
-            conn.rollback()
-
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS banned_devices (
-            device_id TEXT PRIMARY KEY
-        )
-    """)
-
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS utenti (
-            id SERIAL PRIMARY KEY,
-            nome TEXT NOT NULL,
-            cognome TEXT NOT NULL,
-            codice_fiscale TEXT NOT NULL UNIQUE,
-            password_salt TEXT NOT NULL,
-            password_hash TEXT NOT NULL,
-            data_registrazione TEXT NOT NULL
-        )
-    """)
-    conn.commit()
-    conn.close()
-
-
-init_db()
 
 
 # Funzioni di supporto per la verifica del Codice Fiscale
@@ -214,6 +126,7 @@ def calcola_iniziali_cf(cognome, nome):
     return cognome_cf, nome_cf
 
 
+# Tabelle ufficiali per il calcolo del carattere di controllo del Codice Fiscale
 _VALORI_DISPARI = {
     "0": 1, "1": 0, "2": 5, "3": 7, "4": 9, "5": 13, "6": 15, "7": 17, "8": 19, "9": 21,
     "A": 1, "B": 0, "C": 5, "D": 7, "E": 9, "F": 13, "G": 15, "H": 17, "I": 19, "J": 21,
@@ -259,7 +172,7 @@ def valida_codice_fiscale(nome, cognome, cf):
     return True, ""
 
 
-# --- Funzioni Account Utenti ---
+# --- Funzioni di supporto per Account Utenti (Registrazione/Login) ---
 def hash_password(password, salt=None):
     if salt is None:
         salt = secrets.token_hex(16)
@@ -338,6 +251,63 @@ def login_utente(nome, cognome, password):
     return None, "Password errata."
 
 
+# Inizializzazione Database PostgreSQL / Supabase
+def init_db():
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS prenotazioni (
+            id SERIAL PRIMARY KEY,
+            nome TEXT NOT NULL,
+            data TEXT NOT NULL,
+            ora TEXT NOT NULL,
+            trattamento TEXT NOT NULL,
+            data_creazione TEXT NOT NULL,
+            device_id TEXT,
+            stato_presenza TEXT DEFAULT 'Assente',
+            codice_fiscale TEXT,
+            codice_fiscale_2 TEXT
+        )
+    """)
+    conn.commit()
+    
+    for col, col_type in [
+        ("device_id", "TEXT"),
+        ("stato_presenza", "TEXT DEFAULT 'Assente'"),
+        ("codice_fiscale", "TEXT"),
+        ("codice_fiscale_2", "TEXT")
+    ]:
+        try:
+            c.execute(f"ALTER TABLE prenotazioni ADD COLUMN IF NOT EXISTS {col} {col_type}")
+            conn.commit()
+        except Exception:
+            conn.rollback()
+
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS banned_devices (
+            device_id TEXT PRIMARY KEY
+        )
+    """)
+    conn.commit()
+
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS utenti (
+            id SERIAL PRIMARY KEY,
+            nome TEXT NOT NULL,
+            cognome TEXT NOT NULL,
+            codice_fiscale TEXT NOT NULL UNIQUE,
+            password_salt TEXT NOT NULL,
+            password_hash TEXT NOT NULL,
+            data_registrazione TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+
+init_db()
+
+
 def get_orari_per_data(data):
     if isinstance(data, str):
         d = datetime.strptime(data, "%Y-%m-%d").date()
@@ -376,6 +346,7 @@ def get_current_time_local():
         return datetime.now()
 
 
+# Funzione per generare il file ICS universale
 def genera_file_ics(nome_trattamento, data_str, ora_str):
     dt_inizio = datetime.strptime(f"{data_str} {ora_str}", "%Y-%m-%d %H:%M")
     dt_fine = dt_inizio + timedelta(minutes=50)
@@ -404,6 +375,7 @@ END:VCALENDAR"""
     return ics_content
 
 
+# Pop-up modale (Dialog) per l'accettazione obbligatoria del regolamento
 @st.dialog("📜 Regolamento dello Studio - Termini di Servizio")
 def popup_regolamento():
     st.markdown(
@@ -440,7 +412,7 @@ if logo_path:
 
 st.sidebar.title("🔐 Area Riservata (Admin)")
 
-ADMIN_PASSWORD = st.secrets.get("admin", {}).get("password", "MiaPassword2026!")
+ADMIN_PASSWORD = st.secrets.get("admin_password", "PasswordDiFallbackSeNonImpostata")
 
 if "admin_logged_in" not in st.session_state:
     st.session_state["admin_logged_in"] = False
@@ -473,8 +445,9 @@ if st.session_state["admin_logged_in"]:
 
     with st.container(border=True):
         st.subheader("📋 Elenco Prenotazioni & Codici Fiscali")
-        df = load_df(
-            "SELECT id, nome, codice_fiscale, codice_fiscale_2, data, ora, trattamento, stato_presenza, data_creazione, device_id FROM prenotazioni ORDER BY data DESC, ora ASC"
+        df = pd.read_sql_query(
+            "SELECT id, nome, codice_fiscale, codice_fiscale_2, data, ora, trattamento, stato_presenza, data_creazione, device_id FROM prenotazioni ORDER BY data DESC, ora ASC",
+            engine,
         )
 
         if not df.empty:
@@ -567,7 +540,7 @@ if st.session_state["admin_logged_in"]:
         st.markdown("---")
         st.markdown("#### 📈 Riepilogo e Calcolo Totale Sedute (Gestionale)")
         if st.button("📊 Calcola Statistiche e Sedute Svolte per Cliente"):
-            df_stat = load_df(
+            df_stat = pd.read_sql_query(
                 """
                 SELECT nome, 
                        COUNT(CASE WHEN stato_presenza = 'Presente' THEN 1 END) AS sedute_effettuate,
@@ -577,13 +550,14 @@ if st.session_state["admin_logged_in"]:
                 WHERE device_id != 'SYSTEM'
                 GROUP BY nome
                 ORDER BY sedute_effettuate DESC
-            """
+            """,
+                engine,
             )
             if not df_stat.empty:
                 st.dataframe(df_stat, use_container_width=True)
                 st.success("💡 Report calcolato con successo!")
             else:
-                st.info("Nessun dato sufficiente per le statistiche.")
+                st.info("Nastro dati insufficiente per le statistiche.")
 
     with st.container(border=True):
         st.subheader("📷 QR Code Check-in Ingresso Studio")
@@ -742,8 +716,9 @@ if st.session_state["admin_logged_in"]:
 
         with col_sec2:
             st.markdown("##### Banna Utente Individuale")
-            df_prenotazioni_attive = load_df(
-                "SELECT id, nome, trattamento, device_id FROM prenotazioni WHERE device_id != 'SYSTEM'"
+            df_prenotazioni_attive = pd.read_sql_query(
+                "SELECT id, nome, trattamento, device_id FROM prenotazioni WHERE device_id != 'SYSTEM'",
+                engine,
             )
 
             if not df_prenotazioni_attive.empty:
@@ -776,21 +751,22 @@ if st.session_state["admin_logged_in"]:
                             (dev_id_da_bannare,),
                         )
                         conn.commit()
-                        st.success("Utente bannato con successo!")
+                        st.success(f"Utente bannato con successo!")
                     conn.close()
                     st.rerun()
             else:
                 st.info("Nessuna prenotazione disponibile.")
 
         st.markdown("##### 📋 Blacklist Dispositivi")
-        df_banned = load_df(
+        df_banned = pd.read_sql_query(
             """
             SELECT b.device_id, 
-                   COALESCE(STRING_AGG(DISTINCT p.nome, ', '), 'Nessun nome') AS nominativi_utilizzati
+                   COALESCE(string_agg(DISTINCT p.nome, ', '), 'Nessun nome') AS nominativi_utilizzati
             FROM banned_devices b
             LEFT JOIN prenotazioni p ON b.device_id = p.device_id
             GROUP BY b.device_id
-        """
+        """,
+            engine,
         )
 
         if not df_banned.empty:
@@ -820,8 +796,9 @@ if st.session_state["admin_logged_in"]:
             "Puoi eliminarne uno se richiesto."
         )
 
-        df_utenti = load_df(
-            "SELECT id, nome, cognome, codice_fiscale, data_registrazione FROM utenti ORDER BY data_registrazione DESC"
+        df_utenti = pd.read_sql_query(
+            "SELECT id, nome, cognome, codice_fiscale, data_registrazione FROM utenti ORDER BY data_registrazione DESC",
+            engine,
         )
 
         if not df_utenti.empty:
@@ -993,7 +970,7 @@ else:
                                         st.rerun()
                                     else:
                                         st.error(
-                                            "⏳ Il check-in è consentito solo nell'orario prossimo al tuo appuntamento (da 45 minuti prima a 30 minuti dopo)."
+                                            "⏳ Il check-in è consentito solo nell'orario prossimo al tuo appuntamento."
                                         )
 
             st.markdown("<br>", unsafe_allow_html=True)
@@ -1473,7 +1450,7 @@ else:
                 * ⏱️ **Disdette:** Preavviso minimo di 24 ore, in caso contrario la lezione verrà comunque conteggiata.
                 """)
 
-        # Footer: pulsante di logout
+        # --- Footer: pulsante di logout, in basso a sinistra ---
         st.markdown("<br>", unsafe_allow_html=True)
         col_footer_1, col_footer_2 = st.columns([1, 3])
         with col_footer_1:
