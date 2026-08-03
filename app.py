@@ -178,11 +178,7 @@ st.markdown(
     }
 
     /* Stile delle Tab di navigazione */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        justify-content: center;
-    }
-
+    /* Stile delle Tab di navigazione */
     .stTabs [data-baseweb="tab-list"] {
         gap: 10px;
         justify-content: center;
@@ -209,14 +205,16 @@ st.markdown(
         background: linear-gradient(135deg, #fca4c3 0%, #e882a4) !important;
         color: #ffffff !important;
         border-color: #e882a4 !important;
+        border-radius: 14px !important; /* Assicura l'arrotondamento anche da selezionato */
         box-shadow: 0 8px 20px rgba(252, 164, 195, 0.45) !important;
         transform: translateY(-3px) !important; /* Effetto sovrapposizione verso l'alto */
         z-index: 10;
-    
+    }
+
     .stCaption, p {
         text-align: center;
     }
-    
+
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     </style>
