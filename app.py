@@ -1029,7 +1029,7 @@ else:
 
             st.stop()
 
-        # --- GATE DI ACCESSO: Login / Registrazione Account Cliente ---
+        # --- GATE DI ACCESSO: Login / Registrazione / Recupero Password ---
         if "utente_loggato" not in st.session_state:
             if logo_path:
                 c1, c2, c3 = st.columns([1, 2, 1])
@@ -1038,18 +1038,17 @@ else:
 
             st.title("Postura & Pilates")
             st.write("**Dott.ssa Roberta Sinagra**")
-            st.markdown("#### 👤 Accedi al tuo account o registrati")
+            st.markdown("#### 👤 Area Utenti")
             st.markdown(
                 """
                 <div class="box-info-carino">
-                    ✨ Crea un account una sola volta: alle prossime visite ti basterà accedere
-                    con nome, cognome e password, senza dover reinserire il Codice Fiscale ogni volta.
+                    ✨ Accedi al tuo account, registrati o recupera la password in caso di smarrimento.
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
 
-            tab_login, tab_registrazione = st.tabs(["🔑 Accedi", "📝 Registrati"])
+            tab_login, tab_registrazione, tab_recupero = st.tabs(["🔑 Accedi", "📝 Registrati", "🔄 Recupera Password"])
 
             with tab_login:
                 with st.form("form_login_utente"):
@@ -1094,6 +1093,61 @@ else:
                                 st.success(msg)
                             else:
                                 st.error(f"❌ {msg}")
+
+            with tab_recupero:
+                st.markdown("##### 🔄 Reimposta la tua password")
+                st.write("Inserisci i tuoi dati anagrafici e il tuo Codice Fiscale per procedere al cambio password.")
+
+                if "reset_cf_ok" not in st.session_state:
+                    with st.form("form_verifica_recupero"):
+                        rec_nome = st.text_input("Nome *", key="rec_nome_input")
+                        rec_cognome = st.text_input("Cognome *", key="rec_cognome_input")
+                        rec_cf = st.text_input("Codice Fiscale *", key="rec_cf_input")
+                        submit_verifica = st.form_submit_button("Verifica Dati")
+
+                        if submit_verifica:
+                            n_clean = rec_nome.strip().upper()
+                            c_clean = rec_cognome.strip().upper()
+                            cf_clean = rec_cf.strip().upper()
+
+                            if not n_clean or not c_clean or not cf_clean:
+                                st.error("Per favore, compila tutti i campi.")
+                            else:
+                                with engine.begin() as conn:
+                                    res = conn.execute(
+                                        text("SELECT id FROM utenti WHERE UPPER(nome) = :n AND UPPER(cognome) = :c AND UPPER(codice_fiscale) = :cf"),
+                                        {"n": n_clean, "c": c_clean, "cf": cf_clean}
+                                    ).fetchone()
+                                if res:
+                                    st.session_state["reset_cf_ok"] = cf_clean
+                                    st.success("✅ Dati verificati con successo! Inserisci la nuova password qui sotto.")
+                                    st.rerun()
+                                else:
+                                    st.error("❌ Nessun account trovato con questi dati. Verifica che Nome, Cognome e Codice Fiscale siano corretti.")
+                else:
+                    cf_da_aggiornare = st.session_state["reset_cf_ok"]
+                    st.info(f"Stai reimpostando la password per il Codice Fiscale: **{cf_da_aggiornare}**")
+
+                    with st.form("form_nuova_password"):
+                        nuova_p1 = st.text_input("Nuova Password *", type="password", key="nuova_p1_input")
+                        nuova_p2 = st.text_input("Conferma Nuova Password *", type="password", key="nuova_p2_input")
+                        submit_nuova_pwd = st.form_submit_button("Aggiorna Password")
+
+                        if submit_nuova_pwd:
+                            if not nuova_p1 or not nuova_p2:
+                                st.error("Inserisci e conferma la nuova password.")
+                            elif nuova_p1 != nuova_p2:
+                                st.error("Le password inserite non coincidono.")
+                            else:
+                                salt, pwd_hash = hash_password(nuova_p1)
+                                with engine.begin() as conn:
+                                    conn.execute(
+                                        text("UPDATE utenti SET password_salt = :salt, password_hash = :pwd_hash WHERE codice_fiscale = :cf"),
+                                        {"salt": salt, "pwd_hash": pwd_hash, "cf": cf_da_aggiornare}
+                                    )
+                                del st.session_state["reset_cf_ok"]
+                                st.success("🎉 Password aggiornata con successo! Ora puoi effettuare il login con la nuova password.")
+                                st.balloons()
 
             st.stop()
 
