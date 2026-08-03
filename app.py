@@ -1213,10 +1213,9 @@ else:
             unsafe_allow_html=True,
         )
 
-        tab1, tab2, tab3, tab4 = st.tabs([
+        tab1, tab2, tab3 = st.tabs([
             "📅 Prenota",
             "ℹ️ Info Studio",
-            "📍 Dove Siamo",
             "📜 Regolamento",
         ])
 
@@ -1530,11 +1529,20 @@ else:
                             st.session_state["mostra_dialog_regolamento"] = True
                             st.rerun()
 
-        # TAB 2: INFO STUDIO
+        # TAB 2: INFO STUDIO (Include Info + Dove Siamo)
         with tab2:
             st.markdown("### ℹ️ Informazioni sullo Studio")
             st.markdown(
-                "Benvenuto/a nello studio della **Dott.ssa Roberta Sinagra**, specializzato in Posturologia e Pilates.\n\n"
+                "Benvenuto/a nello studio della **Dott.ssa Roberta Sinagra**, specializzato in Posturologia e Pilates."
+            )
+            st.markdown("📍 **Indirizzo:** Inserisci qui l'indirizzo dello studio")
+            st.markdown(
+                "📞 **Telefono / WhatsApp:** [+39 379 2073118](tel:+393792073118) o [Scrivimi su WhatsApp](https://wa.me/393792073118)"
+            )
+            st.markdown(
+                "📧 **Email:** [posturaepilates@outlook.it](mailto:posturaepilates@outlook.it)"
+            )
+            st.markdown(
                 "📸 Seguimi su [Instagram](https://www.instagram.com/posturaepilates/) per rimanere sempre aggiornato/a su consigli posturali, esercizi e novità dello studio!"
             )
 
@@ -1555,22 +1563,8 @@ else:
                 * **🤖 Android (Chrome):** Tocca i tre puntini in alto a destra nel browser e seleziona **"Aggiungi a schermata Home"** o **"Installa app"**.
                 """)
 
-        # TAB 3: DOVE SIAMO
+        # TAB 3: REGOLAMENTO
         with tab3:
-            st.markdown("### 📍 Dove Siamo & Contatti")
-            st.write("📍 **Indirizzo:** Inserisci qui l'indirizzo dello studio")
-            st.markdown(
-                "📞 **Telefono / WhatsApp:** [+39 379"
-                " 2073118](tel:+393792073118) o [Scrivimi su"
-                " WhatsApp](https://wa.me/393792073118)"
-            )
-            st.markdown(
-                "📧 **Email:**"
-                " [posturaepilates@outlook.it](mailto:posturaepilates@outlook.it)"
-            )
-
-        # TAB 4: REGOLAMENTO
-        with tab4:
             st.markdown("### 📜 Regolamento dello Studio")
             st.markdown("""
                 * ⏱️ **Durata Lezione:** La lezione dura 50 minuti.
