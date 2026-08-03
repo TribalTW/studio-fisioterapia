@@ -3,21 +3,23 @@ import hashlib
 import os
 import re
 import secrets
-import sqlite3
 import uuid
 from zoneinfo import ZoneInfo
 import pandas as pd
+import psycopg2
+import psycopg2.extras
+import sqlalchemy
 import streamlit as st
 import streamlit.components.v1 as components
 
-# Configurazione Pagina[cite: 4]
+# Configurazione Pagina
 st.set_page_config(
     page_title="Postura & Pilates - Dott.ssa Roberta Sinagra",
     page_icon="🧘‍♀️",
     layout="centered",
 )
 
-# Stile CSS Avanzato e Professionale
+# Stile CSS Avanzato con Bottoni ad Alta Leggibilità
 st.markdown(
     """
     <style>
@@ -48,27 +50,29 @@ st.markdown(
         box-shadow: 0 0 0 2px rgba(216, 27, 96, 0.15) !important;
     }
     
-    /* Pulsanti principali */
+    /* Pulsanti principali - Testo bianco brillante, leggibile e ben contrastato */
     div.stButton > button, div.stDownloadButton > button {
-        background: linear-gradient(135deg, #D81B60 0%, #ad1457 100%) !important;
-        color: white !important;
+        background: linear-gradient(135deg, #E91E63 0%, #C2185B 100%) !important;
+        color: #FFFFFF !important;
         border-radius: 12px !important;
         font-size: 1.05rem !important;
-        font-weight: 600 !important;
+        font-weight: 700 !important;
         border: none !important;
         width: 100% !important;
         padding: 12px 20px !important;
         margin-top: 8px !important;
         text-align: center !important;
         display: block !important;
-        box-shadow: 0 4px 12px rgba(216, 27, 96, 0.25);
+        box-shadow: 0 4px 12px rgba(216, 27, 96, 0.3);
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
         transition: all 0.3s ease;
     }
     
     div.stButton > button:hover, div.stDownloadButton > button:hover {
-        background: linear-gradient(135deg, #c2185b 0%, #880e4f 100%) !important;
-        box-shadow: 0 6px 16px rgba(216, 27, 96, 0.35);
+        background: linear-gradient(135deg, #D81B60 0%, #AD1457 100%) !important;
+        box-shadow: 0 6px 16px rgba(216, 27, 96, 0.4);
         transform: translateY(-1px);
+        color: #FFFFFF !important;
     }
     
     div[data-testid="stColumn"] div.stButton > button.btn-aggiorna {
@@ -110,12 +114,6 @@ st.markdown(
         color: #555555;
     }
     
-    /* Tabelle ed elementi Streamlit */
-    dataframe, .stDataFrame {
-        border-radius: 12px !important;
-        overflow: hidden;
-    }
-    
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     </style>
@@ -124,7 +122,73 @@ st.markdown(
 )
 
 
-# Funzioni di supporto per la verifica del Codice Fiscale[cite: 4]
+# --- Connessione Supabase & Helper Database ---
+def get_db_connection():
+    db_url = st.secrets["postgres"]["connection_string"]
+    conn = psycopg2.connect(db_url)
+    return conn
+
+
+def get_sql_engine():
+    db_url = st.secrets["postgres"]["connection_string"]
+    return sqlalchemy.create_engine(db_url)
+
+
+# Inizializzazione Tabelle su Supabase
+def init_db():
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS prenotazioni (
+            id SERIAL PRIMARY KEY,
+            nome TEXT NOT NULL,
+            data TEXT NOT NULL,
+            ora TEXT NOT NULL,
+            trattamento TEXT NOT NULL,
+            data_creazione TEXT NOT NULL,
+            device_id TEXT,
+            stato_presenza TEXT DEFAULT 'Assente',
+            codice_fiscale TEXT,
+            codice_fiscale_2 TEXT
+        )
+    """)
+    
+    for col, col_type in [
+        ("device_id", "TEXT"),
+        ("stato_presenza", "TEXT DEFAULT 'Assente'"),
+        ("codice_fiscale", "TEXT"),
+        ("codice_fiscale_2", "TEXT")
+    ]:
+        try:
+            c.execute(f"ALTER TABLE prenotazioni ADD COLUMN IF NOT EXISTS {col} {col_type}")
+        except Exception:
+            conn.rollback()
+
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS banned_devices (
+            device_id TEXT PRIMARY KEY
+        )
+    """)
+
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS utenti (
+            id SERIAL PRIMARY KEY,
+            nome TEXT NOT NULL,
+            cognome TEXT NOT NULL,
+            codice_fiscale TEXT NOT NULL UNIQUE,
+            password_salt TEXT NOT NULL,
+            password_hash TEXT NOT NULL,
+            data_registrazione TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+
+init_db()
+
+
+# Funzioni di supporto per la verifica del Codice Fiscale
 def estrai_consonanti_vocali(testo):
     testo = testo.upper()
     consonanti = "".join([c for c in testo if c.isalpha() and c not in "AEIOU"])
@@ -145,7 +209,6 @@ def calcola_iniziali_cf(cognome, nome):
     return cognome_cf, nome_cf
 
 
-# Tabelle ufficiali per il calcolo del carattere di controllo del Codice Fiscale[cite: 4]
 _VALORI_DISPARI = {
     "0": 1, "1": 0, "2": 5, "3": 7, "4": 9, "5": 13, "6": 15, "7": 17, "8": 19, "9": 21,
     "A": 1, "B": 0, "C": 5, "D": 7, "E": 9, "F": 13, "G": 15, "H": 17, "I": 19, "J": 21,
@@ -191,7 +254,7 @@ def valida_codice_fiscale(nome, cognome, cf):
     return True, ""
 
 
-# --- Funzioni di supporto per Account Utenti (Registrazione/Login)[cite: 4] ---
+# --- Funzioni Account Utenti ---
 def hash_password(password, salt=None):
     if salt is None:
         salt = secrets.token_hex(16)
@@ -221,9 +284,9 @@ def registra_utente(nome, cognome, codice_fiscale, password):
     if not cf_valido:
         return False, f"❌ Codice Fiscale non valido: {cf_msg}"
 
-    conn = sqlite3.connect("prenotazioni.db")
+    conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT id FROM utenti WHERE codice_fiscale = ?", (cf,))
+    c.execute("SELECT id FROM utenti WHERE codice_fiscale = %s", (cf,))
     if c.fetchone():
         conn.close()
         return False, "Esiste già un account registrato con questo Codice Fiscale. Prova ad accedere invece di registrarti."
@@ -231,7 +294,7 @@ def registra_utente(nome, cognome, codice_fiscale, password):
     salt, pwd_hash = hash_password(password)
     data_reg = get_current_time_local().strftime("%Y-%m-%d %H:%M")
     c.execute(
-        "INSERT INTO utenti (nome, cognome, codice_fiscale, password_salt, password_hash, data_registrazione) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO utenti (nome, cognome, codice_fiscale, password_salt, password_hash, data_registrazione) VALUES (%s, %s, %s, %s, %s, %s)",
         (nome, cognome, cf, salt, pwd_hash, data_reg),
     )
     conn.commit()
@@ -246,10 +309,10 @@ def login_utente(nome, cognome, password):
     if not nome or not cognome or not password:
         return None, "Per favore inserisci nome, cognome e password."
 
-    conn = sqlite3.connect("prenotazioni.db")
+    conn = get_db_connection()
     c = conn.cursor()
     c.execute(
-        "SELECT id, nome, cognome, codice_fiscale, password_salt, password_hash FROM utenti WHERE UPPER(nome) = UPPER(?) AND UPPER(cognome) = UPPER(?)",
+        "SELECT id, nome, cognome, codice_fiscale, password_salt, password_hash FROM utenti WHERE UPPER(nome) = UPPER(%s) AND UPPER(cognome) = UPPER(%s)",
         (nome, cognome),
     )
     candidati = c.fetchall()
@@ -268,60 +331,6 @@ def login_utente(nome, cognome, password):
             }, ""
 
     return None, "Password errata."
-
-
-# Inizializzazione Database SQLite[cite: 4]
-def init_db():
-    conn = sqlite3.connect("prenotazioni.db")
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS prenotazioni (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nome TEXT NOT NULL,
-            data TEXT NOT NULL,
-            ora TEXT NOT NULL,
-            trattamento TEXT NOT NULL,
-            data_creazione TEXT NOT NULL,
-            device_id TEXT,
-            stato_presenza TEXT DEFAULT 'Assente',
-            codice_fiscale TEXT,
-            codice_fiscale_2 TEXT
-        )
-    """)
-    
-    for col, col_type in [
-        ("device_id", "TEXT"),
-        ("stato_presenza", "TEXT DEFAULT 'Assente'"),
-        ("codice_fiscale", "TEXT"),
-        ("codice_fiscale_2", "TEXT")
-    ]:
-        try:
-            c.execute(f"ALTER TABLE prenotazioni ADD COLUMN {col} {col_type}")
-        except sqlite3.OperationalError:
-            pass
-
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS banned_devices (
-            device_id TEXT PRIMARY KEY
-        )
-    """)
-
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS utenti (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nome TEXT NOT NULL,
-            cognome TEXT NOT NULL,
-            codice_fiscale TEXT NOT NULL UNIQUE,
-            password_salt TEXT NOT NULL,
-            password_hash TEXT NOT NULL,
-            data_registrazione TEXT NOT NULL
-        )
-    """)
-    conn.commit()
-    conn.close()
-
-
-init_db()
 
 
 def get_orari_per_data(data):
@@ -362,7 +371,6 @@ def get_current_time_local():
         return datetime.now()
 
 
-# Funzione per generare il file ICS universale[cite: 4]
 def genera_file_ics(nome_trattamento, data_str, ora_str):
     dt_inizio = datetime.strptime(f"{data_str} {ora_str}", "%Y-%m-%d %H:%M")
     dt_fine = dt_inizio + timedelta(minutes=50)
@@ -391,7 +399,6 @@ END:VCALENDAR"""
     return ics_content
 
 
-# Pop-up modale (Dialog) per l'accettazione obbligatoria del regolamento[cite: 4]
 @st.dialog("📜 Regolamento dello Studio - Termini di Servizio")
 def popup_regolamento():
     st.markdown(
@@ -422,13 +429,13 @@ for possible_name in [
         break
 
 
-# --- BARRA LATERALE (Admin & Logo)[cite: 4] ---
+# --- BARRA LATERALE (Admin & Logo) ---
 if logo_path:
     st.sidebar.image(logo_path, use_container_width=True)
 
 st.sidebar.title("🔐 Area Riservata (Admin)")
 
-ADMIN_PASSWORD = "MiaPassword2026!"
+ADMIN_PASSWORD = st.secrets.get("admin", {}).get("password", "MiaPassword2026!")
 
 if "admin_logged_in" not in st.session_state:
     st.session_state["admin_logged_in"] = False
@@ -450,7 +457,7 @@ if st.session_state["admin_logged_in"]:
         st.rerun()
 
 
-# --- VISTA 1: PANNELLO AMMINISTRATORE[cite: 4] ---
+# --- VISTA 1: PANNELLO AMMINISTRATORE ---
 if st.session_state["admin_logged_in"]:
     st.title("📊 Gestione Appuntamenti & Studio (Admin)")
 
@@ -461,12 +468,11 @@ if st.session_state["admin_logged_in"]:
 
     with st.container(border=True):
         st.subheader("📋 Elenco Prenotazioni & Codici Fiscali")
-        conn = sqlite3.connect("prenotazioni.db")
+        engine = get_sql_engine()
         df = pd.read_sql_query(
             "SELECT id, nome, codice_fiscale, codice_fiscale_2, data, ora, trattamento, stato_presenza, data_creazione, device_id FROM prenotazioni ORDER BY data DESC, ora ASC",
-            conn,
+            engine,
         )
-        conn.close()
 
         if not df.empty:
             st.dataframe(df, use_container_width=True)
@@ -485,10 +491,10 @@ if st.session_state["admin_logged_in"]:
         )
         data_presenze_str = str(data_presenze)
 
-        conn = sqlite3.connect("prenotazioni.db")
+        conn = get_db_connection()
         c = conn.cursor()
         c.execute(
-            "SELECT id, nome, trattamento, ora, stato_presenza FROM prenotazioni WHERE data = ? AND device_id != 'SYSTEM' ORDER BY ora ASC",
+            "SELECT id, nome, trattamento, ora, stato_presenza FROM prenotazioni WHERE data = %s AND device_id != 'SYSTEM' ORDER BY ora ASC",
             (data_presenze_str,),
         )
         appuntamenti_giorno = c.fetchall()
@@ -541,11 +547,11 @@ if st.session_state["admin_logged_in"]:
                     "💾 Salva Presenze & Genera Codici"
                 )
                 if submit_presenze:
-                    conn = sqlite3.connect("prenotazioni.db")
+                    conn = get_db_connection()
                     c = conn.cursor()
                     for app_id, nuovo_stato in presenze_dict.items():
                         c.execute(
-                            "UPDATE prenotazioni SET stato_presenza = ? WHERE id = ?",
+                            "UPDATE prenotazioni SET stato_presenza = %s WHERE id = %s",
                             (nuovo_stato, app_id),
                         )
                     conn.commit()
@@ -558,7 +564,6 @@ if st.session_state["admin_logged_in"]:
         st.markdown("---")
         st.markdown("#### 📈 Riepilogo e Calcolo Totale Sedute (Gestionale)")
         if st.button("📊 Calcola Statistiche e Sedute Svolte per Cliente"):
-            conn = sqlite3.connect("prenotazioni.db")
             df_stat = pd.read_sql_query(
                 """
                 SELECT nome, 
@@ -570,9 +575,8 @@ if st.session_state["admin_logged_in"]:
                 GROUP BY nome
                 ORDER BY sedute_effettuate DESC
             """,
-                conn,
+                engine,
             )
-            conn.close()
             if not df_stat.empty:
                 st.dataframe(df_stat, use_container_width=True)
                 st.success("💡 Report calcolato con successo!")
@@ -660,7 +664,7 @@ if st.session_state["admin_logged_in"]:
             else:
                 lista_date = [str(data_intervallo)]
 
-            conn = sqlite3.connect("prenotazioni.db")
+            conn = get_db_connection()
             c = conn.cursor()
             ora_attuale_str = get_current_time_local().strftime("%Y-%m-%d %H:%M")
 
@@ -670,12 +674,12 @@ if st.session_state["admin_logged_in"]:
                         orari_giorno = get_orari_per_data(d_str)
                         for h in orari_giorno:
                             c.execute(
-                                "SELECT id FROM prenotazioni WHERE data = ? AND ora = ?",
+                                "SELECT id FROM prenotazioni WHERE data = %s AND ora = %s",
                                 (d_str, h),
                             )
                             if not c.fetchone():
                                 c.execute(
-                                    "INSERT INTO prenotazioni (nome, data, ora, trattamento, data_creazione, device_id, stato_presenza) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                                    "INSERT INTO prenotazioni (nome, data, ora, trattamento, data_creazione, device_id, stato_presenza) VALUES (%s, %s, %s, %s, %s, %s, %s)",
                                     (
                                         "🔒 STUDIO CHIUSO", d_str, h,
                                         "Chiusura Admin",
@@ -684,12 +688,12 @@ if st.session_state["admin_logged_in"]:
                                 )
                     else:
                         c.execute(
-                            "SELECT id FROM prenotazioni WHERE data = ? AND ora = ?",
+                            "SELECT id FROM prenotazioni WHERE data = %s AND ora = %s",
                             (d_str, ora_intervallo),
                         )
                         if not c.fetchone():
                             c.execute(
-                                "INSERT INTO prenotazioni (nome, data, ora, trattamento, data_creazione, device_id, stato_presenza) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                                "INSERT INTO prenotazioni (nome, data, ora, trattamento, data_creazione, device_id, stato_presenza) VALUES (%s, %s, %s, %s, %s, %s, %s)",
                                 (
                                     "🔒 ORARIO CHIUSO", d_str, ora_intervallo,
                                     "Chiusura Admin",
@@ -701,11 +705,11 @@ if st.session_state["admin_logged_in"]:
             elif btn_sblocca:
                 for d_str in lista_date:
                     if modo_intervallo == "Tutta la giornata":
-                        c.execute("DELETE FROM prenotazioni WHERE data = ?", (d_str,))
+                        c.execute("DELETE FROM prenotazioni WHERE data = %s", (d_str,))
                     else:
                         if ora_intervallo:
                             c.execute(
-                                "DELETE FROM prenotazioni WHERE data = ? AND ora = ?",
+                                "DELETE FROM prenotazioni WHERE data = %s AND ora = %s",
                                 (d_str, ora_intervallo),
                             )
                 st.success("Sblocco applicato con successo!")
@@ -726,9 +730,9 @@ if st.session_state["admin_logged_in"]:
             )
             if st.button("Elimina Singola Prenotazione"):
                 if id_da_eliminare > 0:
-                    conn = sqlite3.connect("prenotazioni.db")
+                    conn = get_db_connection()
                     c = conn.cursor()
-                    c.execute("DELETE FROM prenotazioni WHERE id = ?", (id_da_eliminare,))
+                    c.execute("DELETE FROM prenotazioni WHERE id = %s", (id_da_eliminare,))
                     conn.commit()
                     conn.close()
                     st.success(f"Prenotazione #{id_da_eliminare} eliminata!")
@@ -736,12 +740,10 @@ if st.session_state["admin_logged_in"]:
 
         with col_sec2:
             st.markdown("##### Banna Utente Individuale")
-            conn_b = sqlite3.connect("prenotazioni.db")
             df_prenotazioni_attive = pd.read_sql_query(
                 "SELECT id, nome, trattamento, device_id FROM prenotazioni WHERE device_id != 'SYSTEM'",
-                conn_b,
+                engine,
             )
-            conn_b.close()
 
             if not df_prenotazioni_attive.empty:
                 df_prenotazioni_attive["label"] = (
@@ -759,17 +761,17 @@ if st.session_state["admin_logged_in"]:
                 )
                 if st.button("Banna Utente Selezionato"):
                     id_selezionato = int(scelta_ban.split(" - ")[0])
-                    conn = sqlite3.connect("prenotazioni.db")
+                    conn = get_db_connection()
                     c = conn.cursor()
                     c.execute(
-                        "SELECT device_id FROM prenotazioni WHERE id = ?",
+                        "SELECT device_id FROM prenotazioni WHERE id = %s",
                         (id_selezionato,),
                     )
                     res = c.fetchone()
                     if res and res[0]:
                         dev_id_da_bannare = res[0]
                         c.execute(
-                            "INSERT OR IGNORE INTO banned_devices (device_id) VALUES (?)",
+                            "INSERT INTO banned_devices (device_id) VALUES (%s) ON CONFLICT (device_id) DO NOTHING",
                             (dev_id_da_bannare,),
                         )
                         conn.commit()
@@ -780,18 +782,16 @@ if st.session_state["admin_logged_in"]:
                 st.info("Nessuna prenotazione disponibile.")
 
         st.markdown("##### 📋 Blacklist Dispositivi")
-        conn = sqlite3.connect("prenotazioni.db")
         df_banned = pd.read_sql_query(
             """
             SELECT b.device_id, 
-                   COALESCE(GROUP_CONCAT(DISTINCT p.nome), 'Nessun nome') AS nominativi_utilizzati
+                   COALESCE(STRING_AGG(DISTINCT p.nome, ', '), 'Nessun nome') AS nominativi_utilizzati
             FROM banned_devices b
             LEFT JOIN prenotazioni p ON b.device_id = p.device_id
             GROUP BY b.device_id
         """,
-            conn,
+            engine,
         )
-        conn.close()
 
         if not df_banned.empty:
             st.dataframe(df_banned, use_container_width=True)
@@ -801,10 +801,10 @@ if st.session_state["admin_logged_in"]:
                 key="sbianca_device",
             )
             if st.button("Rimuovi Ban (Sbanna)"):
-                conn = sqlite3.connect("prenotazioni.db")
+                conn = get_db_connection()
                 c = conn.cursor()
                 c.execute(
-                    "DELETE FROM banned_devices WHERE device_id = ?", (dev_da_sbannare,)
+                    "DELETE FROM banned_devices WHERE device_id = %s", (dev_da_sbannare,)
                 )
                 conn.commit()
                 conn.close()
@@ -817,15 +817,13 @@ if st.session_state["admin_logged_in"]:
         st.subheader("👤 Gestione Account Registrati")
         st.write(
             "Qui trovi tutti gli account creati dai clienti (Nome, Cognome, Codice Fiscale). "
-            "Puoi eliminarne uno se richiesto (es. per errore, richiesta di cancellazione dati, o duplicato)."
+            "Puoi eliminarne uno se richiesto."
         )
 
-        conn = sqlite3.connect("prenotazioni.db")
         df_utenti = pd.read_sql_query(
             "SELECT id, nome, cognome, codice_fiscale, data_registrazione FROM utenti ORDER BY data_registrazione DESC",
-            conn,
+            engine,
         )
-        conn.close()
 
         if not df_utenti.empty:
             st.dataframe(df_utenti, use_container_width=True)
@@ -846,8 +844,7 @@ if st.session_state["admin_logged_in"]:
                 key="seleziona_utente_elimina_input",
             )
             conferma_eliminazione = st.checkbox(
-                "Confermo di voler eliminare definitivamente questo account "
-                "(il cliente dovrà registrarsi di nuovo per prenotare)",
+                "Confermo di voler eliminare definitivamente questo account",
                 key="conferma_elimina_utente_checkbox",
             )
             if st.button("🗑️ Elimina Account Selezionato"):
@@ -855,9 +852,9 @@ if st.session_state["admin_logged_in"]:
                     st.error("Devi prima confermare la casella qui sopra per procedere con l'eliminazione.")
                 else:
                     id_utente_da_eliminare = int(scelta_utente_elimina.split(" - ")[0])
-                    conn = sqlite3.connect("prenotazioni.db")
+                    conn = get_db_connection()
                     c = conn.cursor()
-                    c.execute("DELETE FROM utenti WHERE id = ?", (id_utente_da_eliminare,))
+                    c.execute("DELETE FROM utenti WHERE id = %s", (id_utente_da_eliminare,))
                     conn.commit()
                     conn.close()
                     st.success(f"Account #{id_utente_da_eliminare} eliminato con successo!")
@@ -866,13 +863,13 @@ if st.session_state["admin_logged_in"]:
             st.info("Nessun account cliente registrato al momento.")
 
 
-# --- VISTA 2: PAGINA PRINCIPALE CLIENTE[cite: 4] ---
+# --- VISTA 2: PAGINA PRINCIPALE CLIENTE ---
 else:
     client_device_id = get_client_device_id()
-    conn = sqlite3.connect("prenotazioni.db")
+    conn = get_db_connection()
     c = conn.cursor()
     c.execute(
-        "SELECT device_id FROM banned_devices WHERE device_id = ?",
+        "SELECT device_id FROM banned_devices WHERE device_id = %s",
         (client_device_id,),
     )
     is_banned = c.fetchone()
@@ -931,15 +928,15 @@ else:
                             if not cf_pulito:
                                 st.error("Per favore, inserisci il tuo codice fiscale.")
                             else:
-                                conn = sqlite3.connect("prenotazioni.db")
+                                conn = get_db_connection()
                                 c = conn.cursor()
                                 c.execute(
                                     """
                                     SELECT id, nome, trattamento, ora, stato_presenza 
                                     FROM prenotazioni 
-                                    WHERE data = ? 
+                                    WHERE data = %s 
                                       AND device_id != 'SYSTEM' 
-                                      AND (UPPER(codice_fiscale) = ? OR UPPER(codice_fiscale_2) = ?)
+                                      AND (UPPER(codice_fiscale) = %s OR UPPER(codice_fiscale_2) = %s)
                                     """,
                                     (oggi_str, cf_pulito, cf_pulito),
                                 )
@@ -982,10 +979,10 @@ else:
                                             appuntamento_valido
                                         )
 
-                                        conn = sqlite3.connect("prenotazioni.db")
+                                        conn = get_db_connection()
                                         c = conn.cursor()
                                         c.execute(
-                                            "UPDATE prenotazioni SET stato_presenza = 'Presente' WHERE id = ?",
+                                            "UPDATE prenotazioni SET stato_presenza = 'Presente' WHERE id = %s",
                                             (p_id,),
                                         )
                                         conn.commit()
@@ -1009,7 +1006,7 @@ else:
 
             st.stop()
 
-        # --- GATE DI ACCESSO: Login / Registrazione Account Cliente[cite: 4] ---
+        # --- GATE DI ACCESSO: Login / Registrazione Account Cliente ---
         if "utente_loggato" not in st.session_state:
             if logo_path:
                 c1, c2, c3 = st.columns([1, 2, 1])
@@ -1100,19 +1097,17 @@ else:
             "📜 Regolamento",
         ])
 
-        # Se il pop-up del regolamento deve essere aperto[cite: 4]
         if st.session_state.get("mostra_dialog_regolamento", False):
             popup_regolamento()
 
-        # Se l'utente ha accettato il regolamento, finalizziamo la prenotazione in sospeso[cite: 4]
         if st.session_state.get("regolamento_accettato", False) and "pending_booking" in st.session_state:
             pb = st.session_state["pending_booking"]
             
-            conn = sqlite3.connect("prenotazioni.db")
+            conn = get_db_connection()
             c = conn.cursor()
             data_creazione_str = get_current_time_local().strftime("%Y-%m-%d %H:%M")
             c.execute(
-                "INSERT INTO prenotazioni (nome, data, ora, trattamento, data_creazione, device_id, stato_presenza, codice_fiscale, codice_fiscale_2) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO prenotazioni (nome, data, ora, trattamento, data_creazione, device_id, stato_presenza, codice_fiscale, codice_fiscale_2) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
                 (
                     pb["nome_completo"],
                     str(pb["data_scelta"]),
@@ -1141,7 +1136,7 @@ else:
             st.session_state["regolamento_accettato"] = False
             st.rerun()
 
-        # TAB 1: PRENOTAZIONE[cite: 4]
+        # TAB 1: PRENOTAZIONE
         with tab1:
             st.markdown("### Modulo di Prenotazione")
 
@@ -1237,10 +1232,10 @@ else:
                             "Seleziona Data *", min_value=datetime.today(), key="data_input"
                         )
 
-                    conn = sqlite3.connect("prenotazioni.db")
+                    conn = get_db_connection()
                     c = conn.cursor()
                     c.execute(
-                        "SELECT ora, trattamento, codice_fiscale, codice_fiscale_2, device_id FROM prenotazioni WHERE data = ?",
+                        "SELECT ora, trattamento, codice_fiscale, codice_fiscale_2, device_id FROM prenotazioni WHERE data = %s",
                         (str(data_scelta),),
                     )
                     prenotazioni_giorno = c.fetchall()
@@ -1324,10 +1319,10 @@ else:
                         cognome_2 = cognome_2.strip().title()
                         codice_fiscale_2 = codice_fiscale_2.strip().upper()
 
-                    conn_check = sqlite3.connect("prenotazioni.db")
+                    conn_check = get_db_connection()
                     c_check = conn_check.cursor()
                     c_check.execute(
-                        "SELECT device_id FROM banned_devices WHERE device_id = ?",
+                        "SELECT device_id FROM banned_devices WHERE device_id = %s",
                         (client_device_id,),
                     )
                     is_banned_now = c_check.fetchone()
@@ -1343,13 +1338,13 @@ else:
                     cf_principale = codice_fiscale.strip().upper()
                     cf_secondario = codice_fiscale_2.strip().upper() if trattamento == "Pilates Duetto (in coppia)" else None
 
-                    conn_dupl = sqlite3.connect("prenotazioni.db")
+                    conn_dupl = get_db_connection()
                     c_dupl = conn_dupl.cursor()
                     c_dupl.execute(
                         """SELECT id FROM prenotazioni 
-                           WHERE data = ? AND ora = ? 
-                             AND (device_id = ? OR UPPER(codice_fiscale) = ? OR UPPER(codice_fiscale_2) = ? 
-                                  OR (? IS NOT NULL AND (UPPER(codice_fiscale) = ? OR UPPER(codice_fiscale_2) = ?)))""",
+                           WHERE data = %s AND ora = %s 
+                             AND (device_id = %s OR UPPER(codice_fiscale) = %s OR UPPER(codice_fiscale_2) = %s 
+                                  OR (%s IS NOT NULL AND (UPPER(codice_fiscale) = %s OR UPPER(codice_fiscale_2) = %s)))""",
                         (
                             str(data_scelta), ora_scelta, 
                             client_device_id, cf_principale, cf_principale,
@@ -1379,10 +1374,10 @@ else:
                         else:
                             nome_completo = f"{nome.strip()} {cognome.strip()}"
 
-                        conn = sqlite3.connect("prenotazioni.db")
+                        conn = get_db_connection()
                         c = conn.cursor()
                         c.execute(
-                            "SELECT trattamento FROM prenotazioni WHERE data = ? AND ora = ?",
+                            "SELECT trattamento FROM prenotazioni WHERE data = %s AND ora = %s",
                             (str(data_scelta), ora_scelta),
                         )
                         esistenti = c.fetchall()
@@ -1428,7 +1423,7 @@ else:
                             conn.close()
                             st.rerun()
 
-        # TAB 2: INFO STUDIO[cite: 4]
+        # TAB 2: INFO STUDIO
         with tab2:
             st.markdown("### ℹ️ Informazioni sullo Studio")
             st.markdown(
@@ -1453,7 +1448,7 @@ else:
                 * **🤖 Android (Chrome):** Tocca i tre puntini in alto a destra nel browser e seleziona **"Aggiungi a schermata Home"** o **"Installa app"**.
                 """)
 
-        # TAB 3: DOVE SIAMO[cite: 4]
+        # TAB 3: DOVE SIAMO
         with tab3:
             st.markdown("### 📍 Dove Siamo & Contatti")
             st.write("📍 **Indirizzo:** Inserisci qui l'indirizzo dello studio")
@@ -1467,7 +1462,7 @@ else:
                 " [posturaepilates@outlook.it](mailto:posturaepilates@outlook.it)"
             )
 
-        # TAB 4: REGOLAMENTO[cite: 4]
+        # TAB 4: REGOLAMENTO
         with tab4:
             st.markdown("### 📜 Regolamento dello Studio")
             st.markdown("""
@@ -1479,7 +1474,7 @@ else:
                 * ⏱️ **Disdette:** Preavviso minimo di 24 ore, in caso contrario la lezione verrà comunque conteggiata.
                 """)
 
-        # --- Footer: pulsante di logout, in basso a sinistra ---
+        # Footer: pulsante di logout
         st.markdown("<br>", unsafe_allow_html=True)
         col_footer_1, col_footer_2 = st.columns([1, 3])
         with col_footer_1:
