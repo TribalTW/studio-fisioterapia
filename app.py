@@ -366,7 +366,7 @@ def reset_password_utente(nome, cognome, cf, nuova_password):
                     "cf": cf.strip().upper()
                 }
             )
-        return True, "Password aggiornata con successo! Ora puoi effettuare l'accesso nel tab Accedi."
+        return True, "Password aggiornata con successo! Ora puoi effettuare l'accesso con la nuova password."
     except Exception as e:
         return False, str(e)
 
@@ -1104,7 +1104,7 @@ else:
 
             st.stop()
 
-        # --- GATE DI ACCESSO: Login / Registrazione / Recupero Account Cliente (Con st.tabs) ---
+        # --- GATE DI ACCESSO: Login / Registrazione / Recupero Account Cliente ---
         if "utente_loggato" not in st.session_state:
             if logo_path:
                 c1, c2, c3 = st.columns([1, 2, 1])
@@ -1123,15 +1123,27 @@ else:
                 unsafe_allow_html=True,
             )
 
-            # Utilizzo dei tab nativi di Streamlit
-            tab_accedi, tab_registra, tab_recupera = st.tabs([
-                "🔑 Accedi", 
-                "📝 Registrati", 
-                "🔄 Recupera Password"
-            ])
+            if "auth_tab_scelta" not in st.session_state:
+                st.session_state["auth_tab_scelta"] = "🔑 Accedi"
 
-            with tab_accedi:
-                st.markdown("<br>", unsafe_allow_html=True)
+            col_btn_t1, col_btn_t2, col_btn_t3 = st.columns(3)
+            with col_btn_t1:
+                if st.button("🔑 Accedi", use_container_width=True, key="btn_nav_accedi"):
+                    st.session_state["auth_tab_scelta"] = "🔑 Accedi"
+                    st.rerun()
+            with col_btn_t2:
+                if st.button("📝 Registrati", use_container_width=True, key="btn_nav_registra"):
+                    st.session_state["auth_tab_scelta"] = "📝 Registrati"
+                    st.rerun()
+            with col_btn_t3:
+                if st.button("🔄 Recupera Password", use_container_width=True, key="btn_nav_recupera"):
+                    st.session_state["auth_tab_scelta"] = "🔄 Recupera Password"
+                    st.rerun()
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            if st.session_state["auth_tab_scelta"] == "🔑 Accedi":
+                st.markdown("### 🔑 Accedi al tuo account")
                 with st.form("form_login_utente"):
                     login_nome = st.text_input("Nome *", key="login_nome_input")
                     login_cognome = st.text_input("Cognome *", key="login_cognome_input")
@@ -1150,8 +1162,8 @@ else:
                         else:
                             st.error(f"❌ {msg_errore}")
 
-            with tab_registra:
-                st.markdown("<br>", unsafe_allow_html=True)
+            elif st.session_state["auth_tab_scelta"] == "📝 Registrati":
+                st.markdown("### 📝 Registra un nuovo account")
                 with st.form("form_registrazione_utente"):
                     reg_nome = st.text_input("Nome *", key="reg_nome_input")
                     reg_cognome = st.text_input("Cognome *", key="reg_cognome_input")
@@ -1176,8 +1188,8 @@ else:
                             else:
                                 st.error(f"❌ {msg}")
 
-            with tab_recupera:
-                st.markdown("<br>", unsafe_allow_html=True)
+            elif st.session_state["auth_tab_scelta"] == "🔄 Recupera Password":
+                st.markdown("### 🔄 Recupera / Reimposta Password")
                 with st.form("form_recupero_password"):
                     rec_nome = st.text_input("Nome *", key="rec_nome_input")
                     rec_cognome = st.text_input("Cognome *", key="rec_cognome_input")
@@ -1201,7 +1213,9 @@ else:
                             )
                             if successo:
                                 st.success(msg)
-                                st.info("💡 Campi svuotati con successo! Ora seleziona il tab **Accedi** qui sopra per entrare.")
+                                # Svuota i campi e reindirizza alla pagina di login
+                                st.session_state["auth_tab_scelta"] = "🔑 Accedi"
+                                st.rerun()
                             else:
                                 st.error(f"❌ {msg}")
 
