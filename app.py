@@ -119,8 +119,8 @@ st.markdown(
         box-shadow: 0 0 0 3px rgba(216, 27, 96, 0.15) !important;
     }
     
-    /* Pulsanti professionali con effetti di transizione e ombreggiatura */
-    div.stButton > button, div.stDownloadButton > button {
+    /* Pulsanti professionali (inclusi i pulsanti dei form come Accedi) con effetti di transizione e ombreggiatura */
+    div.stButton > button, div.stDownloadButton > button, div.stFormSubmitButton > button {
         background: linear-gradient(135deg, #D81B60 0%, #AD1457 100%) !important;
         color: white !important;
         border-radius: 12px !important;
@@ -137,14 +137,14 @@ st.markdown(
         cursor: pointer;
     }
     
-    div.stButton > button:hover, div.stDownloadButton > button:hover {
+    div.stButton > button:hover, div.stDownloadButton > button:hover, div.stFormSubmitButton > button:hover {
         background: linear-gradient(135deg, #C2185B 0%, #880E4F 100%) !important;
         color: white !important;
         box-shadow: 0 6px 20px rgba(216, 27, 96, 0.45) !important;
         transform: translateY(-2px);
     }
 
-    div.stButton > button:active {
+    div.stButton > button:active, div.stFormSubmitButton > button:active {
         transform: translateY(0px);
         box-shadow: 0 2px 10px rgba(216, 27, 96, 0.3) !important;
     }
@@ -312,7 +312,7 @@ def valida_codice_fiscale(nome, cognome, cf):
     return True, ""
 
 
-# --- Funzioni di supporto per Account Utenti (Registrazione/Login/Recupero) ---
+# --- Funzioni di supporto per Account Utenti (Registrazione/Login) ---
 def hash_password(password, salt=None):
     if salt is None:
         salt = secrets.token_hex(16)
@@ -388,43 +388,6 @@ def login_utente(nome, cognome, password):
                 return None, "Password errata."
     except Exception as e:
         return None, str(e)
-
-
-def reset_password(nome, cognome, cf, nuova_password):
-    salt, pwd_hash = hash_password(nuova_password)
-    try:
-        with engine.begin() as conn:
-            res = conn.execute(
-                text("""
-                    SELECT id FROM utenti 
-                    WHERE UPPER(nome) = :nome AND UPPER(cognome) = :cognome AND UPPER(codice_fiscale) = :cf
-                """),
-                {
-                    "nome": nome.strip().upper(),
-                    "cognome": cognome.strip().upper(),
-                    "cf": cf.strip().upper()
-                }
-            ).fetchone()
-            
-            if not res:
-                return False, "Nessun utente trovato con questi dati (Nome, Cognome e Codice Fiscale corrispondenti)."
-            
-            uid = res[0]
-            conn.execute(
-                text("""
-                    UPDATE utenti 
-                    SET password_salt = :salt, password_hash = :pwd_hash 
-                    WHERE id = :id
-                """),
-                {
-                    "salt": salt,
-                    "pwd_hash": pwd_hash,
-                    "id": uid
-                }
-            )
-        return True, "Password modificata con successo!"
-    except Exception as e:
-        return False, str(e)
 
 
 def get_orari_per_data(data):
@@ -1182,62 +1145,23 @@ else:
             tab_login, tab_registrazione = st.tabs(["🔑 Accedi", "📝 Registrati"])
 
             with tab_login:
-                if st.session_state.get("mostra_recupero_password", False):
-                    st.markdown("#### 🔑 Recupera Password")
-                    st.write("Inserisci i tuoi dati e imposta una nuova password per il tuo account.")
-                    with st.form("form_recupero_password"):
-                        rec_nome = st.text_input("Nome *", key="rec_nome_input")
-                        rec_cognome = st.text_input("Cognome *", key="rec_cognome_input")
-                        rec_cf = st.text_input("Codice Fiscale *", key="rec_cf_input")
-                        rec_nuova_password = st.text_input("Nuova Password *", type="password", key="rec_nuova_password_input")
-                        rec_nuova_password_conferma = st.text_input("Conferma Nuova Password *", type="password", key="rec_nuova_password_conferma_input")
-                        
-                        col_r1, col_r2 = st.columns(2)
-                        with col_r1:
-                            submit_cambia_pwd = st.form_submit_button("Cambia password")
-                        with col_r2:
-                            annulla_recupero = st.form_submit_button("Annulla")
-                            
-                        if submit_cambia_pwd:
-                            if rec_nuova_password != rec_nuova_password_conferma:
-                                st.error("❌ Le due password inserite non coincidono.")
-                            else:
-                                successo, msg = reset_password(rec_nome, rec_cognome, rec_cf, rec_nuova_password)
-                                if successo:
-                                    st.success("🎉 Password modificata con successo! Reindirizzamento al login...")
-                                    st.session_state["mostra_recupero_password"] = False
-                                    st.rerun()
-                                else:
-                                    st.error(f"❌ {msg}")
-                        if annulla_recupero:
-                            st.session_state["mostra_recupero_password"] = False
-                            st.rerun()
-                else:
-                    with st.form("form_login_utente"):
-                        login_nome = st.text_input("Nome *", key="login_nome_input")
-                        login_cognome = st.text_input("Cognome *", key="login_cognome_input")
-                        login_password = st.text_input(
-                            "Password *", type="password", key="login_password_input"
-                        )
-                        
-                        col_btn_1, col_btn_2 = st.columns(2)
-                        with col_btn_1:
-                            submit_login = st.form_submit_button("Accedi")
-                        with col_btn_2:
-                            submit_recupera = st.form_submit_button("Recupera password")
+                with st.form("form_login_utente"):
+                    login_nome = st.text_input("Nome *", key="login_nome_input")
+                    login_cognome = st.text_input("Cognome *", key="login_cognome_input")
+                    login_password = st.text_input(
+                        "Password *", type="password", key="login_password_input"
+                    )
+                    submit_login = st.form_submit_button("Accedi")
 
-                        if submit_login:
-                            utente, msg_errore = login_utente(
-                                login_nome, login_cognome, login_password
-                            )
-                            if utente:
-                                st.session_state["utente_loggato"] = utente
-                                st.rerun()
-                            else:
-                                st.error(f"❌ {msg_errore}")
-                        elif submit_recupera:
-                            st.session_state["mostra_recupero_password"] = True
+                    if submit_login:
+                        utente, msg_errore = login_utente(
+                            login_nome, login_cognome, login_password
+                        )
+                        if utente:
+                            st.session_state["utente_loggato"] = utente
                             st.rerun()
+                        else:
+                            st.error(f"❌ {msg_errore}")
 
             with tab_registrazione:
                 with st.form("form_registrazione_utente"):
