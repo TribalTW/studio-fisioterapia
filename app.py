@@ -826,7 +826,8 @@ else:
                         )
                     st.markdown("---")
 
-                if st.button("Effettua una nuova prenotazione"):
+                # Pulsante di ritorno chiaro e intuitivo con freccia
+                if st.button("⬅️ Torna Indietro / Effettua Nuova Prenotazione"):
                     del st.session_state["booking_success_msg"]
                     if "ics_data" in st.session_state:
                         del st.session_state["ics_data"]
