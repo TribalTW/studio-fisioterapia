@@ -178,7 +178,7 @@ st.markdown(
     }
     
     /* Stile delle Tab di navigazione - Uniforme e a capsula */
-    /* Sblocca i contenitori per evitare qualsiasi taglio superiore o laterale */
+    /* Sblocca i contenitori per evitare qualsiasi taglio */
     .stTabs, .stTabs [data-baseweb="tab-list"], .stTabs div {
         overflow: visible !important;
     }
@@ -188,13 +188,15 @@ st.markdown(
         display: none !important;
     }
 
-    /* Tab non selezionate: più larghe ai lati ma snelle sopra/sotto */
+    /* Tab non selezionate: larghezza forzata e padding laterale molto ampio */
     .stTabs [data-baseweb="tab"] {
         background-color: #fff0f5;
         border-radius: 40px !important;
         color: #880E4F;
         font-weight: 600;
-        padding: 10px 48px !important; /* 10px sopra/sotto, 48px a destra/sinistra */
+        padding: 12px 65px !important; /* Padding laterale massiccio */
+        min-width: 170px !important;   /* Forza una larghezza minima generosa */
+        text-align: center !important;
         font-size: 16px !important;
         border: 1.5px solid #fca4c3 !important;
         transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
@@ -211,6 +213,8 @@ st.markdown(
         color: #ffffff !important;
         border-color: #e882a4 !important;
         border-radius: 40px !important;
+        padding: 12px 65px !important;
+        min-width: 170px !important;
         box-shadow: 0 12px 30px rgba(232, 130, 164, 0.55) !important;
         transform: translateY(-5px) scale(1.04) !important;
         z-index: 999 !important;
