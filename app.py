@@ -76,14 +76,14 @@ def init_db():
 
 init_db()
 
-# Stile CSS della pagina (Palette Rosa Pastello Sofisticato e Professionale)
+# Stile CSS della pagina (Palette Rosa Pastello Sofisticato + Font Boutique: Playfair Display & Lato)
 st.markdown(
     """
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,300;0,400;0,700;1,300&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400&display=swap');
 
     html, body, [class*="css"] {
-        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-family: 'Lato', sans-serif;
         color: #2C2C2C;
     }
 
@@ -148,8 +148,10 @@ st.markdown(
     }
     
     h1, h2, h3, h4 {
+        font-family: 'Playfair Display', serif !important;
         color: #8A4F5C !important;
         text-align: center;
+        letter-spacing: 0.3px;
     }
     
     .box-info-carino {
@@ -573,7 +575,7 @@ if st.session_state["admin_logged_in"]:
         components.html(
             """
         <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; background: #ffffff; padding: 20px; border-radius: 12px; border: 2px dashed #C27885;">
-            <h4 style="color: #8A4F5C; margin-bottom: 10px;">Inquadra per Check-in Studio 🧘‍♀️</h4>
+            <h4 style="color: #8A4F5C; margin-bottom: 10px; font-family: 'Playfair Display', serif;">Inquadra per Check-in Studio 🧘‍♀️</h4>
             <div id="qrcode" style="margin: 15px;"></div>
             <p style="font-size: 12px; color: #555; text-align: center;">Inquadra con la fotocamera dello smartphone all'arrivo in studio.</p>
         </div>
@@ -874,7 +876,7 @@ else:
                     st.markdown("---")
                     st.markdown(f"**Il tuo Codice Seduta:**")
                     st.markdown(
-                        f"<h3 style='color: #C27885; text-align: center;'>`SEDUTA-OK-{p_id}-{oggi_str}`</h3>",
+                        f"<h3 style='color: #C27885; text-align: center; font-family: \"Playfair Display\", serif;'>`SEDUTA-OK-{p_id}-{oggi_str}`</h3>",
                         unsafe_allow_html=True,
                     )
             else:
@@ -1201,7 +1203,7 @@ else:
                     st.markdown(
                         """
                         <div style="background-color: #FFF5F7; padding: 22px; border-radius: 14px; border: 2px solid #C27885; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-                            <h3 style="color: #8A4F5C; margin-top: 0; font-size: 1.35rem;">📲 SALVA L'APPUNTAMENTO NEL TUO CALENDARIO</h3>
+                            <h3 style="color: #8A4F5C; margin-top: 0; font-size: 1.35rem; font-family: 'Playfair Display', serif;">📲 SALVA L'APPUNTAMENTO NEL TUO CALENDARIO</h3>
                             <p style="font-size: 1.05rem; color: #333; margin-bottom: 15px; line-height: 1.5;">
                                 Clicca sul pulsante qui sotto per scaricare il file dell'evento. Bastano pochissimi secondi per salvarlo sul tuo telefono o computer!
                             </p>
