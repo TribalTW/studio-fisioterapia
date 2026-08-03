@@ -76,93 +76,127 @@ def init_db():
 
 init_db()
 
-# Stile CSS della pagina (Palette Rosa Pastello Sofisticato + Font Boutique: Playfair Display & Lato)
+# Stile CSS professionale e raffinato con tema rosa pastello (#fca4c3), ombreggiature e animazioni
 st.markdown(
     """
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,300;0,400;0,700;1,300&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400&display=swap');
-
-    html, body, [class*="css"] {
-        font-family: 'Lato', sans-serif;
-        color: #2C2C2C;
-    }
-
+    /* Sfondo generale pulito */
     .stApp {
-        background-color: #FAFAFA;
+        background-color: #fff9fb;
+        font-family: 'Inter', sans-serif;
     }
 
-    [data-testid="stSidebar"] {
-        background-color: #FFF5F7;
-        border-right: 1px solid #F2E1E6;
-    }
-
+    /* Container professionali con bordi arrotondati, sfumatura delicata e ombreggiature con animazione */
     div.stVerticalBlockBorderWrapper, div[data-testid="stVerticalBlockBorderWrapper"] {
-        background-color: #FFFFFF !important;
-        border: 1px solid #EED5DC !important;
-        border-radius: 16px !important;
-        padding: 20px !important;
-        box-shadow: 0 4px 20px rgba(194, 120, 133, 0.06) !important;
+        background: linear-gradient(135deg, #ffffff 0%, #fff5f8 100%) !important;
+        border: 1px solid #f9d1df !important;
+        border-radius: 20px !important;
+        padding: 24px !important;
+        box-shadow: 0 10px 30px rgba(252, 164, 195, 0.15) !important;
+        transition: all 0.3s ease-in-out !important;
+    }
+    
+    div[data-testid="stVerticalBlockBorderWrapper"]:hover {
+        box-shadow: 0 15px 35px rgba(252, 164, 195, 0.25) !important;
+        transform: translateY(-2px);
     }
     
     div[data-testid="stVerticalBlockBorderWrapper"] div {
         background-color: transparent !important;
     }
     
+    /* Campi di input moderni */
     .stTextInput input, .stSelectbox > div > div, .stDateInput input, .stNumberInput input {
         background-color: #FFFFFF !important;
-        border-radius: 8px !important;
-        border: 1px solid #E6D0D6 !important;
+        border-radius: 10px !important;
+        border: 1.5px solid #f2c2d5 !important;
+        padding: 10px 14px !important;
+        transition: all 0.2s ease-in-out !important;
     }
 
-    .stTextInput input:focus, div[data-baseweb="select"] > div:hover {
-        border-color: #C27885 !important;
+    .stTextInput input:focus, .stSelectbox > div > div:focus, .stDateInput input:focus, .stNumberInput input:focus {
+        border-color: #D81B60 !important;
+        box-shadow: 0 0 0 3px rgba(216, 27, 96, 0.15) !important;
     }
     
+    /* Pulsanti professionali con effetti di transizione e ombreggiatura */
     div.stButton > button, div.stDownloadButton > button {
-        background-color: #C27885 !important;
+        background: linear-gradient(135deg, #D81B60 0%, #AD1457 100%) !important;
         color: white !important;
         border-radius: 12px !important;
         font-size: 1.05rem !important;
         font-weight: 600 !important;
         border: none !important;
         width: 100% !important;
-        padding: 12px 20px !important;
-        margin-top: 5px !important;
+        padding: 12px 24px !important;
+        margin-top: 8px !important;
         text-align: center !important;
         display: block !important;
-        box-shadow: 0 4px 12px rgba(194, 120, 133, 0.2) !important;
-        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(216, 27, 96, 0.3) !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        cursor: pointer;
     }
     
     div.stButton > button:hover, div.stDownloadButton > button:hover {
-        background-color: #B26573 !important;
+        background: linear-gradient(135deg, #C2185B 0%, #880E4F 100%) !important;
         color: white !important;
-        box-shadow: 0 6px 16px rgba(194, 120, 133, 0.3) !important;
+        box-shadow: 0 6px 20px rgba(216, 27, 96, 0.45) !important;
+        transform: translateY(-2px);
+    }
+
+    div.stButton > button:active {
+        transform: translateY(0px);
+        box-shadow: 0 2px 10px rgba(216, 27, 96, 0.3) !important;
     }
     
     div[data-testid="stColumn"] div.stButton > button.btn-aggiorna {
-        padding: 6px 15px !important;
+        padding: 8px 16px !important;
         font-size: 0.9rem !important;
         width: auto !important;
         white-space: nowrap !important;
     }
     
+    /* Tipografia e Titoli */
     h1, h2, h3, h4 {
-        font-family: 'Playfair Display', serif !important;
-        color: #8A4F5C !important;
+        color: #880E4F !important;
+        font-weight: 700 !important;
+        letter-spacing: -0.5px;
         text-align: center;
-        letter-spacing: 0.3px;
     }
     
+    /* Box informativo in stile pastello (#fca4c3) */
     .box-info-carino {
-        background-color: #FFF5F7 !important;
-        border: 1px solid #EED5DC !important;
-        border-radius: 12px !important;
-        padding: 14px 18px !important;
-        margin-bottom: 18px !important;
+        background: linear-gradient(135deg, #fff0f5 0%, #ffe4ec) !important;
+        border: 1px solid #fca4c3 !important;
+        border-radius: 14px !important;
+        padding: 16px 20px !important;
+        margin-bottom: 20px !important;
         text-align: center !important;
-        color: #8A4F5C !important;
-        font-size: 0.95rem !important;
+        color: #880E4F !important;
+        font-size: 0.98rem !important;
+        box-shadow: 0 4px 15px rgba(252, 164, 195, 0.15) !important;
+    }
+
+    /* Stile delle Tab di navigazione */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        justify-content: center;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        background-color: #fff0f5;
+        border-radius: 10px 10px 0 0;
+        color: #880E4F;
+        font-weight: 600;
+        padding: 10px 20px;
+        border: 1px solid #fca4c3;
+        transition: all 0.2s ease;
+    }
+
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #fca4c3 0%, #e882a4) !important;
+        color: #ffffff !important;
+        box-shadow: 0 4px 10px rgba(252, 164, 195, 0.3);
     }
     
     .stCaption, p {
@@ -517,7 +551,7 @@ if st.session_state["admin_logged_in"]:
                         if is_presente:
                             codice_seduta = f"SEDUTA-OK-{app_id}-{data_presenze_str}"
                             st.markdown(
-                                f"<code style='color: #C27885; font-weight: bold;'>{codice_seduta}</code>",
+                                f"<code style='color: #D81B60; font-weight: bold;'>{codice_seduta}</code>",
                                 unsafe_allow_html=True,
                             )
                         else:
@@ -574,8 +608,8 @@ if st.session_state["admin_logged_in"]:
 
         components.html(
             """
-        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; background: #ffffff; padding: 20px; border-radius: 12px; border: 2px dashed #C27885;">
-            <h4 style="color: #8A4F5C; margin-bottom: 10px; font-family: 'Playfair Display', serif;">Inquadra per Check-in Studio 🧘‍♀️</h4>
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; background: #ffffff; padding: 20px; border-radius: 12px; border: 2px dashed #D81B60;">
+            <h4 style="color: #880E4F; margin-bottom: 10px;">Inquadra per Check-in Studio 🧘‍♀️</h4>
             <div id="qrcode" style="margin: 15px;"></div>
             <p style="font-size: 12px; color: #555; text-align: center;">Inquadra con la fotocamera dello smartphone all'arrivo in studio.</p>
         </div>
@@ -876,7 +910,7 @@ else:
                     st.markdown("---")
                     st.markdown(f"**Il tuo Codice Seduta:**")
                     st.markdown(
-                        f"<h3 style='color: #C27885; text-align: center; font-family: \"Playfair Display\", serif;'>`SEDUTA-OK-{p_id}-{oggi_str}`</h3>",
+                        f"<h3 style='color: #D81B60; text-align: center;'>`SEDUTA-OK-{p_id}-{oggi_str}`</h3>",
                         unsafe_allow_html=True,
                     )
             else:
@@ -1202,8 +1236,8 @@ else:
                     st.markdown("---")
                     st.markdown(
                         """
-                        <div style="background-color: #FFF5F7; padding: 22px; border-radius: 14px; border: 2px solid #C27885; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-                            <h3 style="color: #8A4F5C; margin-top: 0; font-size: 1.35rem; font-family: 'Playfair Display', serif;">📲 SALVA L'APPUNTAMENTO NEL TUO CALENDARIO</h3>
+                        <div style="background-color: #fff0f5; padding: 22px; border-radius: 14px; border: 2px solid #D81B60; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                            <h3 style="color: #880E4F; margin-top: 0; font-size: 1.35rem;">📲 SALVA L'APPUNTAMENTO NEL TUO CALENDARIO</h3>
                             <p style="font-size: 1.05rem; color: #333; margin-bottom: 15px; line-height: 1.5;">
                                 Clicca sul pulsante qui sotto per scaricare il file dell'evento. Bastano pochissimi secondi per salvarlo sul tuo telefono o computer!
                             </p>
