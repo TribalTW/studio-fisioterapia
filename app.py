@@ -1191,7 +1191,7 @@ else:
 
             with tab_login:
                 if st.session_state.get("vista_recupero", False):
-                    st.markdown("##### 🔑 Reimposta Password")
+                    st.markdown("<h5 style='text-align: center; color: #880E4F;'>🔑 Reimposta Password</h5>", unsafe_allow_html=True)
                     st.write("Inserisci Nome, Cognome, Codice Fiscale e la nuova password.")
                     with st.form("form_recupero_password"):
                         rec_nome = st.text_input("Nome *", key="rec_nome_input")
