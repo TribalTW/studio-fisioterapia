@@ -234,7 +234,7 @@ def popup_regolamento():
         * 🧦 **Abbigliamento e Calzini:** È obbligatorio l'uso di **calzini antiscivolo** durante tutte le lezioni.
         * 🧴 **Asciugamano:** Si richiede di portare un proprio asciugamano personale.
         * 📵 **Cellulari:** Modalità silenziosa consigliata.
-        * ⏱️ **Disdette:** Preavviso minimo di 24 ore, in caso contrario la lezione verrà comunque conteggiata.
+        * ⏱️ **Disdette:** Preavviso minimo di 24 ore.
         """
     )
     st.markdown("---")
@@ -1136,9 +1136,9 @@ else:
         # TAB 2: INFO STUDIO
         with tab2:
             st.markdown("### ℹ️ Informazioni sullo Studio")
-            st.write(
-                "Benvenuto/a nello studio della **Dott.ssa Roberta Sinagra**,"
-                " specializzato in Posturologia e Pilates."
+            st.markdown(
+                "Benvenuto/a nello studio della **Dott.ssa Roberta Sinagra**, specializzato in Posturologia e Pilates.\n\n"
+                "📸 [Seguici su Instagram](https://www.instagram.com/robertasinagra.posturologia) per rimanere sempre aggiornato/a su consigli posturali, esercizi e novità dello studio!"
             )
 
             st.markdown("---")
@@ -1181,5 +1181,5 @@ else:
                 * 🧦 **Abbigliamento e Calzini:** È obbligatorio l'uso di **calzini antiscivolo** durante tutte le lezioni.
                 * 🧴 **Asciugamano:** Si richiede di portare un proprio asciugamano personale.
                 * 📵 **Cellulari:** Modalità silenziosa consigliata.
-                * ⏱️ **Disdette:** Preavviso minimo di 24 ore, in caso contrario la lezione verrà comunque conteggiata.
+                * ⏱️ **Disdette:** Preavviso minimo di 24 ore.
                 """)
