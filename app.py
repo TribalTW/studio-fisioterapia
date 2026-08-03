@@ -1138,7 +1138,7 @@ else:
             st.markdown("### ℹ️ Informazioni sullo Studio")
             st.markdown(
                 "Benvenuto/a nello studio della **Dott.ssa Roberta Sinagra**, specializzato in Posturologia e Pilates.\n\n"
-                "📸 [Seguimi su Instagram](https://www.instagram.com/posturaepilates/) per rimanere sempre aggiornato/a su consigli posturali, esercizi e novità dello studio!"
+                "📸 Seguimi su [Instagram](https://www.instagram.com/posturaepilates/) per rimanere sempre aggiornato/a su consigli posturali, esercizi e novità dello studio!"
             )
 
             st.markdown("---")
