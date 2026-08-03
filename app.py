@@ -966,30 +966,124 @@ else:
                     current_date = current_datetime.date()
                     current_time = current_datetime.time()
 
-                    cf_curr = codice## Come cambiare il colore dei link
+                    orari_occupati = {p[0] for p in prenotazioni_giorno}
+                    orari_disponibili = [h for h in TUTTI_GLI_ORARI if h not in orari_occupati]
 
-**Sì, assolutamente!** Il colore predefinito dei link (solitamente azzurro o blu chiaro) può essere modificato facilmente a seconda del contesto in cui stai lavorando (HTML, CSS, Markdown o CMS). 
+                    if data_scelta == current_date:
+                        orari_disponibili = [
+                            h for h in orari_disponibili
+                            if datetime.strptime(h, "%H:%M").time() > current_time
+                        ]
 
-Ecco i metodi principali per farlo:
+                    with col2:
+                        ora_scelta = st.selectbox(
+                            "Seleziona Orario Disponibile *",
+                            orari_disponibili if orari_disponibili else ["Nessun orario disponibile"],
+                            key="ora_input"
+                        )
 
----
+                    st.markdown("---")
+                    
+                    if st.button("📅 Conferma e Prenota", use_container_width=True):
+                        nome_pulito = nome.strip()
+                        cognome_pulito = cognome.strip()
+                        cf_principale = codice_fiscale.strip().upper()
+                        
+                        nome_2_pulito = nome_2.strip() if trattamento == "Pilates Duetto (in coppia)" else ""
+                        cognome_2_pulito = cognome_2.strip() if trattamento == "Pilates Duetto (in coppia)" else ""
+                        cf_secondario = codice_fiscale_2.strip().upper() if trattamento == "Pilates Duetto (in coppia)" else ""
 
-### 1. Usando i CSS (Il metodo standard per i siti web)
-Se stai sviluppando una pagina web, puoi personalizzare i CSS per gestire il link in tutti i suoi stati (normale, al passaggio del mouse, visitato):
+                        campi_mancanti = not nome_pulito or not cognome_pulito or not cf_principale
+                        if trattamento == "Pilates Duetto (in coppia)":
+                            if not nome_2_pulito or not cognome_2_pulito or not cf_secondario:
+                                campi_mancanti = True
 
-```css
-/* Colore normale del link */
-a {
-    color: #ff5733; /* Sostituisci con il codice esadecimale o il nome del colore */
-    text-decoration: none; /* Rimuove la sottolineatura, facoltativo */
-}
+                        if campi_mancanti:
+                            st.error("⚠️ Compila tutti i campi obbligatori contrassegnati con l'asterisco (*).")
+                        elif ora_scelta == "Nessun orario disponibile":
+                            st.error("⚠️ Seleziona un orario valido per procedere.")
+                        else:
+                            valido_1, err_1 = valida_codice_fiscale(nome_pulito, cognome_pulito, cf_principale)
+                            if not valido_1:
+                                st.error(f"❌ Errore Codice Fiscale (1ª persona): {err_1}")
+                            else:
+                                valido_2 = True
+                                if trattamento == "Pilates Duetto (in coppia)":
+                                    valido_2, err_2 = valida_codice_fiscale(nome_2_pulito, cognome_2_pulito, cf_secondario)
+                                    if not valido_2:
+                                        st.error(f"❌ Errore Codice Fiscale (2ª persona): {err_2}")
 
-/* Colore quando il cursore passa sopra al link (Hover) */
-a:hover {
-    color: #c70039;
-}
+                                if valido_1 and valido_2:
+                                    nome_completo = f"{nome_pulito} {cognome_pulito}"
+                                    if trattamento == "Pilates Duetto (in coppia)":
+                                        nome_completo += f" & {nome_2_pulito} {cognome_2_pulito}"
 
-/* Colore del link dopo che è stato visitato */
-a:visited {
-    color: #900c3f;
-}
+                                    conn = sqlite3.connect("prenotazioni.db")
+                                    c = conn.cursor()
+                                    c.execute(
+                                        "SELECT id FROM prenotazioni WHERE data = ? AND ora = ?",
+                                        (str(data_scelta), ora_scelta),
+                                    )
+                                    gia_prenotato = c.fetchone()
+                                    conn.close()
+
+                                    if gia_prenotato:
+                                        st.error("⚠️ Spiacente, questo orario è appena stato prenotato da un altro utente. Scegline un altro.")
+                                    else:
+                                        st.session_state["pending_booking"] = {
+                                            "nome_completo": nome_completo,
+                                            "nome": nome_pulito,
+                                            "cognome": cognome_pulito,
+                                            "data_scelta": data_scelta,
+                                            "ora_scelta": ora_scelta,
+                                            "trattamento": trattamento,
+                                            "client_device_id": client_device_id,
+                                            "cf_principale": cf_principale,
+                                            "cf_secondario": cf_secondario if trattamento == "Pilates Duetto (in coppia)" else None
+                                        }
+                                        st.session_state["mostra_dialog_regolamento"] = True
+                                        st.rerun()
+
+        # TAB 2: INFO STUDIO
+        with tab2:
+            st.markdown("### ℹ️ Informazioni sullo Studio")
+            st.write(
+                """
+                Lo studio della **Dott.ssa Roberta Sinagra** è un punto di riferimento specializzato 
+                nella rieducazione posturale, chinesiologia e nel Pilates terapeutico e individuale.
+                
+                * **Tipologia di Lezioni:** Individuali, in coppia (Duetto) o valutazioni posturali dedicate.
+                * **Ambiente:** Riservato, climatizzato e dotato di attrezzature professionali specifiche.
+                * **Telefono / WhatsApp:** Disponibile per contatti diretti tramite i canali ufficiali dello studio.
+                """
+            )
+
+        # TAB 3: DOVE SIAMO
+        with tab3:
+            st.markdown("### 📍 Dove Siamo e Contatti")
+            st.write("Studio di Postura & Pilates - Dott.ssa Roberta Sinagra")
+            st.markdown("📍 **Indirizzo:** Via Roma / Via Principale dello Studio (Inserire indirizzo esatto)")
+            
+            st.markdown("---")
+            st.markdown("##### 📱 Contattaci o seguici online:")
+            st.markdown(
+                """
+                <div style="text-align: center; margin-top: 15px;">
+                    <a href="https://instagram.com" target="_blank" style="margin-right: 20px; font-size: 1.1rem;">📸 Instagram</a>
+                    <a href="https://wa.me/393000000000" target="_blank" style="font-size: 1.1rem;">💬 WhatsApp</a>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        # TAB 4: REGOLAMENTO
+        with tab4:
+            st.markdown("### 📜 Regolamento Completo dello Studio")
+            st.markdown(
+                """
+                1. **Orari e Puntualità:** Si richiede di arrivare puntuali all'orario stabilito per garantire il corretto svolgimento della seduta (durata 50 minuti).
+                2. **Disdette:** Eventuali disdette o spostamenti devono essere comunicati con almeno **24 ore di preavviso**.
+                3. **Abbigliamento:** È obbligatorio l'utilizzo di **calzini antiscivolo** puliti e di un asciugamano personale.
+                4. **Pagamenti e Abbonamenti:** Le modalità di saldo delle sedute vengono concordate direttamente in studio con la Dott.ssa Sinagra.
+                """
+            )
