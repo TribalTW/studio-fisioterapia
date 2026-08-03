@@ -15,7 +15,7 @@ st.set_page_config(
     layout="centered",
 )
 
-# Stile CSS della pagina
+# Stile CSS della pagina (inclusi i colori personalizzati per i link)
 st.markdown(
     """
     <style>
@@ -69,6 +69,17 @@ st.markdown(
     
     .stCaption, p {
         text-align: center;
+    }
+    
+    /* Personalizzazione colore dei link cliccabili */
+    a {
+        color: #D81B60 !important;
+        text-decoration: none;
+        font-weight: 600;
+    }
+    a:hover {
+        color: #880E4F !important;
+        text-decoration: underline;
     }
     
     #MainMenu {visibility: hidden;}
@@ -955,231 +966,30 @@ else:
                     current_date = current_datetime.date()
                     current_time = current_datetime.time()
 
-                    cf_curr = codice_fiscale.strip().upper() if codice_fiscale else ""
-                    cf_curr_2 = codice_fiscale_2.strip().upper() if codice_fiscale_2 else ""
+                    cf_curr = codice## Come cambiare il colore dei link
 
-                    orari_disponibili = []
-                    for h in TUTTI_GLI_ORARI:
-                        posti_occupati = 0
-                        slot_bloccato = False
-                        utente_gia_prenotato = False
+**Sì, assolutamente!** Il colore predefinito dei link (solitamente azzurro o blu chiaro) può essere modificato facilmente a seconda del contesto in cui stai lavorando (HTML, CSS, Markdown o CMS). 
 
-                        for p_ora, p_trattamento, p_cf1, p_cf2, p_dev in prenotazioni_giorno:
-                            if p_ora == h:
-                                if (
-                                    p_trattamento in ("Chiusura Admin", "🔒 STUDIO CHIUSO")
-                                    or "CHIUSO" in p_trattamento
-                                ):
-                                    slot_bloccato = True
-                                    break
-                                
-                                if p_dev == client_device_id:
-                                    utente_gia_prenotato = True
-                                if cf_curr and (p_cf1 == cf_curr or p_cf2 == cf_curr or p_cf1 == cf_curr_2 or p_cf2 == cf_curr_2):
-                                    utente_gia_prenotato = True
-                                if cf_curr_2 and (p_cf1 == cf_curr_2 or p_cf2 == cf_curr_2):
-                                    utente_gia_prenotato = True
+Ecco i metodi principali per farlo:
 
-                                if p_trattamento == "Pilates Duetto (in coppia)":
-                                    posti_occupati += 2
-                                else:
-                                    posti_occupati += 1
+---
 
-                        if slot_bloccato or utente_gia_prenotato:
-                            continue
+### 1. Usando i CSS (Il metodo standard per i siti web)
+Se stai sviluppando una pagina web, puoi personalizzare i CSS per gestire il link in tutti i suoi stati (normale, al passaggio del mouse, visitato):
 
-                        if trattamento == "Pilates Duetto (in coppia)":
-                            if posti_occupati > 0:
-                                continue
-                        else:
-                            if posti_occupati >= 2:
-                                continue
+```css
+/* Colore normale del link */
+a {
+    color: #ff5733; /* Sostituisci con il codice esadecimale o il nome del colore */
+    text-decoration: none; /* Rimuove la sottolineatura, facoltativo */
+}
 
-                        if data_scelta == current_date:
-                            slot_time = datetime.strptime(h, "%H:%M").time()
-                            if slot_time <= current_time:
-                                continue
+/* Colore quando il cursore passa sopra al link (Hover) */
+a:hover {
+    color: #c70039;
+}
 
-                        orari_disponibili.append(h)
-
-                    with col2:
-                        if orari_disponibili:
-                            ora_scelta = st.selectbox(
-                                "Seleziona Ora *", orari_disponibili, key="ora_input"
-                            )
-                        else:
-                            st.selectbox(
-                                "Seleziona Ora *",
-                                ["Tutto occupato / Chiuso / Già prenotato"],
-                                disabled=True,
-                                key="dis_ora_occupato",
-                            )
-                            ora_scelta = None
-
-                    submitted = st.button("Conferma Prenotazione")
-
-                if submitted:
-                    nome = nome.strip().title()
-                    cognome = cognome.strip().title()
-                    codice_fiscale = codice_fiscale.strip().upper()
-                    
-                    if trattamento == "Pilates Duetto (in coppia)":
-                        nome_2 = nome_2.strip().title()
-                        cognome_2 = cognome_2.strip().title()
-                        codice_fiscale_2 = codice_fiscale_2.strip().upper()
-
-                    conn_check = sqlite3.connect("prenotazioni.db")
-                    c_check = conn_check.cursor()
-                    c_check.execute(
-                        "SELECT device_id FROM banned_devices WHERE device_id = ?",
-                        (client_device_id,),
-                    )
-                    is_banned_now = c_check.fetchone()
-                    conn_check.close()
-
-                    cf_valido, cf_msg = valida_codice_fiscale(nome, cognome, codice_fiscale)
-                    
-                    cf_2_valido = True
-                    cf_2_msg = ""
-                    if trattamento == "Pilates Duetto (in coppia)":
-                        cf_2_valido, cf_2_msg = valida_codice_fiscale(nome_2, cognome_2, codice_fiscale_2)
-
-                    cf_principale = codice_fiscale.strip().upper()
-                    cf_secondario = codice_fiscale_2.strip().upper() if trattamento == "Pilates Duetto (in coppia)" else None
-
-                    conn_dupl = sqlite3.connect("prenotazioni.db")
-                    c_dupl = conn_dupl.cursor()
-                    c_dupl.execute(
-                        """SELECT id FROM prenotazioni 
-                           WHERE data = ? AND ora = ? 
-                             AND (device_id = ? OR UPPER(codice_fiscale) = ? OR UPPER(codice_fiscale_2) = ? 
-                                  OR (? IS NOT NULL AND (UPPER(codice_fiscale) = ? OR UPPER(codice_fiscale_2) = ?)))""",
-                        (
-                            str(data_scelta), ora_scelta, 
-                            client_device_id, cf_principale, cf_principale,
-                            cf_secondario, cf_secondario, cf_secondario
-                        )
-                    )
-                    gia_presente = c_dupl.fetchone()
-                    conn_dupl.close()
-
-                    if is_banned_now:
-                        st.error("⛔ Spiacenti, questo dispositivo è stato bloccato.")
-                    elif not nome.strip() or not cognome.strip() or not codice_fiscale.strip():
-                        st.error("Per favore inserisci nome, cognome e codice fiscale.")
-                    elif not cf_valido:
-                        st.error(f"❌ **Codice Fiscale non valido per {nome} {cognome}:** {cf_msg}")
-                    elif trattamento == "Pilates Duetto (in coppia)" and (not nome_2.strip() or not cognome_2.strip() or not codice_fiscale_2.strip()):
-                        st.error("Per favore inserisci tutti i dati anche per la seconda persona.")
-                    elif trattamento == "Pilates Duetto (in coppia)" and not cf_2_valido:
-                        st.error(f"❌ **Codice Fiscale non valido per la seconda persona ({nome_2} {cognome_2}):** {cf_2_msg}")
-                    elif gia_presente:
-                        st.error("⚠️ Hai già una prenotazione attiva in questo giorno e orario (oppure uno dei partecipanti risulta già registrato nello stesso slot).")
-                    elif not ora_scelta or "Tutto occupato" in ora_scelta or "Già prenotato" in ora_scelta:
-                        st.error("Spiacenti, non ci sono orari disponibili per la data selezionata.")
-                    else:
-                        if trattamento == "Pilates Duetto (in coppia)":
-                            nome_completo = f"{nome.strip()} {cognome.strip()} & {nome_2.strip()} {cognome_2.strip()}"
-                        else:
-                            nome_completo = f"{nome.strip()} {cognome.strip()}"
-
-                        conn = sqlite3.connect("prenotazioni.db")
-                        c = conn.cursor()
-                        c.execute(
-                            "SELECT trattamento FROM prenotazioni WHERE data = ? AND ora = ?",
-                            (str(data_scelta), ora_scelta),
-                        )
-                        esistenti = c.fetchall()
-
-                        slot_occupato = False
-                        posti_occupati = 0
-                        for (p_trattamento,) in esistenti:
-                            if (
-                                p_trattamento in ("Chiusura Admin", "🔒 STUDIO CHIUSO")
-                                or "CHIUSO" in p_trattamento
-                            ):
-                                slot_occupato = True
-                                break
-                            elif p_trattamento == "Pilates Duetto (in coppia)":
-                                posti_occupati += 2
-                            else:
-                                posti_occupati += 1
-
-                        impossibile_prenotare = False
-                        if slot_occupato:
-                            impossibile_prenotare = True
-                        elif trattamento == "Pilates Duetto (in coppia)" and posti_occupati > 0:
-                            impossibile_prenotare = True
-                        elif trattamento != "Pilates Duetto (in coppia)" and posti_occupati >= 2:
-                            impossibile_prenotare = True
-
-                        if impossibile_prenotare:
-                            st.error("⚠️ Spiacenti, questo orario è stato appena occupato! Riprova con un altro orario.")
-                            conn.close()
-                        else:
-                            # Memorizziamo i dati in sospeso e attiviamo il pop-up del regolamento
-                            st.session_state["pending_booking"] = {
-                                "nome_completo": nome_completo,
-                                "data_scelta": data_scelta,
-                                "ora_scelta": ora_scelta,
-                                "trattamento": trattamento,
-                                "client_device_id": client_device_id,
-                                "cf_principale": cf_principale,
-                                "cf_secondario": cf_secondario,
-                                "nome": nome,
-                                "cognome": cognome
-                            }
-                            st.session_state["mostra_dialog_regolamento"] = True
-                            conn.close()
-                            st.rerun()
-
-        # TAB 2: INFO STUDIO
-        with tab2:
-            st.markdown("### ℹ️ Informazioni sullo Studio")
-            st.markdown(
-                "Benvenuto/a nello studio della **Dott.ssa Roberta Sinagra**, specializzato in Posturologia e Pilates.\n\n"
-                "📸 Seguimi su [Instagram](https://www.instagram.com/posturaepilates/) per rimanere sempre aggiornato/a su consigli posturali, esercizi e novità dello studio!"
-            )
-
-            st.markdown("---")
-            st.markdown("#### 💳 Tipologie di Abbonamenti e Tariffe")
-            st.markdown("""
-                * 🏷️ **Abbonamento Trimestrale:** 3 mesi, 2 volte a settimana (massimo 3 recuperi)
-                * 🏷️ **Abbonamento Mensile:** 1 mese, 2 volte a settimana (massimo 3 recuperi)
-                * 🏷️ **Carnet 10 Lezioni:** 10 lezioni spendibili nell'arco dei 3 mesi
-                * 🏷️ **Lezione Singola:** Ingresso singolo
-                """)
-
-            st.markdown("---")
-            st.markdown("#### 📱 Installa la Web App sullo Smartphone")
-            st.markdown("""
-                Puoi aggiungere questa applicazione alla schermata principale del tuo telefono per accedere velocemente alle prenotazioni:
-                * **🍎 iPhone / iPad (Safari):** Tocca l'icona di condivisione nel menu in basso e seleziona **"Aggiungi alla schermata Home"**.
-                * **🤖 Android (Chrome):** Tocca i tre puntini in alto a destra nel browser e seleziona **"Aggiungi a schermata Home"** o **"Installa app"**.
-                """)
-
-        # TAB 3: DOVE SIAMO
-        with tab3:
-            st.markdown("### 📍 Dove Siamo & Contatti")
-            st.write("📍 **Indirizzo:** Inserisci qui l'indirizzo dello studio")
-            st.markdown(
-                "📞 **Telefono / WhatsApp:** [+39 379"
-                " 2073118](tel:+393792073118) o [Scrivimi su"
-                " WhatsApp](https://wa.me/393792073118)"
-            )
-            st.markdown(
-                "📧 **Email:**"
-                " [posturaepilates@outlook.it](mailto:posturaepilates@outlook.it)"
-            )
-
-        # TAB 4: REGOLAMENTO
-        with tab4:
-            st.markdown("### 📜 Regolamento dello Studio")
-            st.markdown("""
-                * ⏱️ **Durata Lezione:** La lezione dura 50 minuti.
-                * 🕒 **Puntualità:** Si raccomanda di presentarsi circa 5 minuti prima dell'orario della seduta.
-                * 🧦 **Abbigliamento e Calzini:** È obbligatorio l'uso di **calzini antiscivolo** durante tutte le lezioni.
-                * 🧴 **Asciugamano:** Si richiede di portare un proprio asciugamano personale.
-                * 📵 **Cellulari:** Modalità silenziosa consigliata.
-                * ⏱️ **Disdette:** Preavviso minimo di 24 ore.
-                """)
+/* Colore del link dopo che è stato visitato */
+a:visited {
+    color: #900c3f;
+}
