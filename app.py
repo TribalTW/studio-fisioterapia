@@ -10,51 +10,65 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
-# Configurazione Pagina
+# Configurazione Pagina[cite: 4]
 st.set_page_config(
     page_title="Postura & Pilates - Dott.ssa Roberta Sinagra",
     page_icon="🧘‍♀️",
     layout="centered",
 )
 
-# Stile CSS della pagina
+# Stile CSS Avanzato e Professionale
 st.markdown(
     """
     <style>
+    /* Stile generale e container */
     div.stVerticalBlockBorderWrapper, div[data-testid="stVerticalBlockBorderWrapper"] {
-        background-color: #fca4c3 !important;
-        border: 1px solid #e882a4 !important;
+        background-color: #fff9fc !important;
+        border: 1px solid #f3b6cc !important;
         border-radius: 16px !important;
-        padding: 20px !important;
+        padding: 24px !important;
+        box-shadow: 0 4px 20px rgba(216, 27, 96, 0.05);
     }
     
     div[data-testid="stVerticalBlockBorderWrapper"] div {
         background-color: transparent !important;
     }
     
+    /* Input di testo, select e date */
     .stTextInput input, .stSelectbox > div > div, .stDateInput input, .stNumberInput input {
         background-color: #FFFFFF !important;
-        border-radius: 8px !important;
-        border: 1px solid #E0E0E0 !important;
+        border-radius: 10px !important;
+        border: 1px solid #e0cbd3 !important;
+        padding: 10px 14px !important;
+        color: #4a1525 !important;
     }
     
+    .stTextInput input:focus, .stSelectbox > div > div:focus-within {
+        border-color: #D81B60 !important;
+        box-shadow: 0 0 0 2px rgba(216, 27, 96, 0.15) !important;
+    }
+    
+    /* Pulsanti principali */
     div.stButton > button, div.stDownloadButton > button {
-        background-color: #D81B60 !important;
+        background: linear-gradient(135deg, #D81B60 0%, #ad1457 100%) !important;
         color: white !important;
         border-radius: 12px !important;
-        font-size: 1.1rem !important;
-        font-weight: bold !important;
+        font-size: 1.05rem !important;
+        font-weight: 600 !important;
         border: none !important;
         width: 100% !important;
         padding: 12px 20px !important;
-        margin-top: 5px !important;
+        margin-top: 8px !important;
         text-align: center !important;
         display: block !important;
+        box-shadow: 0 4px 12px rgba(216, 27, 96, 0.25);
+        transition: all 0.3s ease;
     }
     
     div.stButton > button:hover, div.stDownloadButton > button:hover {
-        background-color: #C2185B !important;
-        color: white !important;
+        background: linear-gradient(135deg, #c2185b 0%, #880e4f 100%) !important;
+        box-shadow: 0 6px 16px rgba(216, 27, 96, 0.35);
+        transform: translateY(-1px);
     }
     
     div[data-testid="stColumn"] div.stButton > button.btn-aggiorna {
@@ -64,24 +78,42 @@ st.markdown(
         white-space: nowrap !important;
     }
     
+    /* Tipografia e Titoli */
     h1, h2, h3, h4 {
         color: #880E4F !important;
-        text-align: center;
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        font-weight: 700;
+        letter-spacing: -0.5px;
     }
     
+    h1 {
+        text-align: center;
+        font-size: 2.2rem !important;
+        margin-bottom: 0.2rem !important;
+    }
+    
+    /* Box informativi personalizzati */
     .box-info-carino {
-        background-color: #fff5f8 !important;
+        background: linear-gradient(135deg, #fff0f5 100%, #ffe4ee 0%);
         border: 1px solid #f3b6cc !important;
-        border-radius: 12px !important;
-        padding: 14px 18px !important;
-        margin-bottom: 18px !important;
+        border-radius: 14px !important;
+        padding: 16px 20px !important;
+        margin-bottom: 20px !important;
         text-align: center !important;
         color: #880E4F !important;
-        font-size: 0.95rem !important;
+        font-size: 0.98rem !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.02);
     }
     
     .stCaption, p {
         text-align: center;
+        color: #555555;
+    }
+    
+    /* Tabelle ed elementi Streamlit */
+    dataframe, .stDataFrame {
+        border-radius: 12px !important;
+        overflow: hidden;
     }
     
     #MainMenu {visibility: hidden;}
@@ -92,7 +124,7 @@ st.markdown(
 )
 
 
-# Funzioni di supporto per la verifica del Codice Fiscale
+# Funzioni di supporto per la verifica del Codice Fiscale[cite: 4]
 def estrai_consonanti_vocali(testo):
     testo = testo.upper()
     consonanti = "".join([c for c in testo if c.isalpha() and c not in "AEIOU"])
@@ -113,7 +145,7 @@ def calcola_iniziali_cf(cognome, nome):
     return cognome_cf, nome_cf
 
 
-# Tabelle ufficiali per il calcolo del carattere di controllo del Codice Fiscale
+# Tabelle ufficiali per il calcolo del carattere di controllo del Codice Fiscale[cite: 4]
 _VALORI_DISPARI = {
     "0": 1, "1": 0, "2": 5, "3": 7, "4": 9, "5": 13, "6": 15, "7": 17, "8": 19, "9": 21,
     "A": 1, "B": 0, "C": 5, "D": 7, "E": 9, "F": 13, "G": 15, "H": 17, "I": 19, "J": 21,
@@ -132,7 +164,7 @@ _LETTERE_RESTO = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 def calcola_carattere_controllo_cf(cf_15):
     totale = 0
     for i, carattere in enumerate(cf_15):
-        posizione = i + 1  # posizione 1-indicizzata
+        posizione = i + 1
         if posizione % 2 != 0:
             totale += _VALORI_DISPARI[carattere]
         else:
@@ -142,7 +174,6 @@ def calcola_carattere_controllo_cf(cf_15):
 
 def valida_codice_fiscale(nome, cognome, cf):
     cf = cf.strip().upper()
-    # Lettera del mese: A,B,C,D,E,H,L,M,P,R,S,T (i 12 mesi, in ordine gennaio->dicembre)
     regex_cf = r"^[A-Z]{6}[0-9]{2}[ABCDEHLMPRST][0-9]{2}[A-Z][0-9]{3}[A-Z]$"
     if not re.match(regex_cf, cf):
         return False, "Il formato del Codice Fiscale non è valido (deve essere di 16 caratteri alfanumerici corretti)."
@@ -160,7 +191,7 @@ def valida_codice_fiscale(nome, cognome, cf):
     return True, ""
 
 
-# --- Funzioni di supporto per Account Utenti (Registrazione/Login) ---
+# --- Funzioni di supporto per Account Utenti (Registrazione/Login)[cite: 4] ---
 def hash_password(password, salt=None):
     if salt is None:
         salt = secrets.token_hex(16)
@@ -239,7 +270,7 @@ def login_utente(nome, cognome, password):
     return None, "Password errata."
 
 
-# Inizializzazione Database SQLite
+# Inizializzazione Database SQLite[cite: 4]
 def init_db():
     conn = sqlite3.connect("prenotazioni.db")
     c = conn.cursor()
@@ -331,7 +362,7 @@ def get_current_time_local():
         return datetime.now()
 
 
-# Funzione per generare il file ICS universale
+# Funzione per generare il file ICS universale[cite: 4]
 def genera_file_ics(nome_trattamento, data_str, ora_str):
     dt_inizio = datetime.strptime(f"{data_str} {ora_str}", "%Y-%m-%d %H:%M")
     dt_fine = dt_inizio + timedelta(minutes=50)
@@ -360,7 +391,7 @@ END:VCALENDAR"""
     return ics_content
 
 
-# Pop-up modale (Dialog) per l'accettazione obbligatoria del regolamento
+# Pop-up modale (Dialog) per l'accettazione obbligatoria del regolamento[cite: 4]
 @st.dialog("📜 Regolamento dello Studio - Termini di Servizio")
 def popup_regolamento():
     st.markdown(
@@ -391,13 +422,13 @@ for possible_name in [
         break
 
 
-# --- BARRA LATERALE (Admin & Logo) ---
+# --- BARRA LATERALE (Admin & Logo)[cite: 4] ---
 if logo_path:
     st.sidebar.image(logo_path, use_container_width=True)
 
 st.sidebar.title("🔐 Area Riservata (Admin)")
 
-ADMIN_PASSWORD = st.secrets.get("admin_password", "PasswordDiFallbackSeNonImpostata")
+ADMIN_PASSWORD = "MiaPassword2026!"
 
 if "admin_logged_in" not in st.session_state:
     st.session_state["admin_logged_in"] = False
@@ -419,7 +450,7 @@ if st.session_state["admin_logged_in"]:
         st.rerun()
 
 
-# --- VISTA 1: PANNELLO AMMINISTRATORE ---
+# --- VISTA 1: PANNELLO AMMINISTRATORE[cite: 4] ---
 if st.session_state["admin_logged_in"]:
     st.title("📊 Gestione Appuntamenti & Studio (Admin)")
 
@@ -835,7 +866,7 @@ if st.session_state["admin_logged_in"]:
             st.info("Nessun account cliente registrato al momento.")
 
 
-# --- VISTA 2: PAGINA PRINCIPALE CLIENTE ---
+# --- VISTA 2: PAGINA PRINCIPALE CLIENTE[cite: 4] ---
 else:
     client_device_id = get_client_device_id()
     conn = sqlite3.connect("prenotazioni.db")
@@ -978,7 +1009,7 @@ else:
 
             st.stop()
 
-        # --- GATE DI ACCESSO: Login / Registrazione Account Cliente ---
+        # --- GATE DI ACCESSO: Login / Registrazione Account Cliente[cite: 4] ---
         if "utente_loggato" not in st.session_state:
             if logo_path:
                 c1, c2, c3 = st.columns([1, 2, 1])
@@ -1069,11 +1100,11 @@ else:
             "📜 Regolamento",
         ])
 
-        # Se il pop-up del regolamento deve essere aperto
+        # Se il pop-up del regolamento deve essere aperto[cite: 4]
         if st.session_state.get("mostra_dialog_regolamento", False):
             popup_regolamento()
 
-        # Se l'utente ha accettato il regolamento, finalizziamo la prenotazione in sospeso
+        # Se l'utente ha accettato il regolamento, finalizziamo la prenotazione in sospeso[cite: 4]
         if st.session_state.get("regolamento_accettato", False) and "pending_booking" in st.session_state:
             pb = st.session_state["pending_booking"]
             
@@ -1110,7 +1141,7 @@ else:
             st.session_state["regolamento_accettato"] = False
             st.rerun()
 
-        # TAB 1: PRENOTAZIONE
+        # TAB 1: PRENOTAZIONE[cite: 4]
         with tab1:
             st.markdown("### Modulo di Prenotazione")
 
@@ -1382,7 +1413,6 @@ else:
                             st.error("⚠️ Spiacenti, questo orario è stato appena occupato! Riprova con un altro orario.")
                             conn.close()
                         else:
-                            # Memorizziamo i dati in sospeso e attiviamo il pop-up del regolamento
                             st.session_state["pending_booking"] = {
                                 "nome_completo": nome_completo,
                                 "data_scelta": data_scelta,
@@ -1398,7 +1428,7 @@ else:
                             conn.close()
                             st.rerun()
 
-        # TAB 2: INFO STUDIO
+        # TAB 2: INFO STUDIO[cite: 4]
         with tab2:
             st.markdown("### ℹ️ Informazioni sullo Studio")
             st.markdown(
@@ -1423,7 +1453,7 @@ else:
                 * **🤖 Android (Chrome):** Tocca i tre puntini in alto a destra nel browser e seleziona **"Aggiungi a schermata Home"** o **"Installa app"**.
                 """)
 
-        # TAB 3: DOVE SIAMO
+        # TAB 3: DOVE SIAMO[cite: 4]
         with tab3:
             st.markdown("### 📍 Dove Siamo & Contatti")
             st.write("📍 **Indirizzo:** Inserisci qui l'indirizzo dello studio")
@@ -1437,7 +1467,7 @@ else:
                 " [posturaepilates@outlook.it](mailto:posturaepilates@outlook.it)"
             )
 
-        # TAB 4: REGOLAMENTO
+        # TAB 4: REGOLAMENTO[cite: 4]
         with tab4:
             st.markdown("### 📜 Regolamento dello Studio")
             st.markdown("""
