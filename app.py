@@ -183,21 +183,35 @@ st.markdown(
         justify-content: center;
     }
 
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 10px;
+        justify-content: center;
+        border-bottom: none !important;
+        overflow: visible !important;
+    }
+
     .stTabs [data-baseweb="tab"] {
         background-color: #fff0f5;
-        border-radius: 10px 10px 0 0;
+        border-radius: 14px !important; /* Arrotondate su tutti i lati (stile pillola) */
         color: #880E4F;
         font-weight: 600;
-        padding: 10px 20px;
-        border: 1px solid #fca4c3;
-        transition: all 0.2s ease;
+        padding: 10px 22px;
+        border: 1.5px solid #fca4c3 !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+
+    .stTabs [data-baseweb="tab"]:hover {
+        background-color: #ffe4ec;
+        transform: translateY(-1px);
     }
 
     .stTabs [aria-selected="true"] {
         background: linear-gradient(135deg, #fca4c3 0%, #e882a4) !important;
         color: #ffffff !important;
-        box-shadow: 0 4px 10px rgba(252, 164, 195, 0.3);
-    }
+        border-color: #e882a4 !important;
+        box-shadow: 0 8px 20px rgba(252, 164, 195, 0.45) !important;
+        transform: translateY(-3px) !important; /* Effetto sovrapposizione verso l'alto */
+        z-index: 10;
     
     .stCaption, p {
         text-align: center;
