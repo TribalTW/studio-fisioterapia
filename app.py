@@ -11,14 +11,14 @@ import streamlit as st
 import streamlit.components.v1 as components
 from sqlalchemy import create_engine, text
 
-# Configurazione Pagina
+# Configurazione Pagina[cite: 1]
 st.set_page_config(
     page_title="Postura & Pilates - Dott.ssa Roberta Sinagra",
     page_icon="🧘‍♀️",
     layout="centered",
 )
 
-# Connessione a Supabase / PostgreSQL con caching delle risorse
+# Connessione a Supabase / PostgreSQL con caching delle risorse[cite: 1]
 @st.cache_resource
 def get_db_engine():
     db_url = st.secrets["supabase"]["db_url"]
@@ -26,7 +26,7 @@ def get_db_engine():
 
 engine = get_db_engine()
 
-# Inizializzazione Database PostgreSQL / Supabase (Eseguita una sola volta)
+# Inizializzazione Database PostgreSQL / Supabase (Eseguita una sola volta)[cite: 1]
 @st.cache_resource
 def init_db():
     with engine.begin() as conn:
@@ -76,7 +76,7 @@ def init_db():
 
 init_db()
 
-# Stile CSS professionale e raffinato con tema rosa pastello (#fca4c3), ombreggiature e animazioni
+# Stile CSS professionale e raffinato con tema rosa pastello (#fca4c3), ombreggiature e animazioni[cite: 1]
 st.markdown(
     """
     <style>
@@ -260,7 +260,7 @@ st.markdown(
 )
 
 
-# Funzioni di supporto per la verifica del Codice Fiscale
+# Funzioni di supporto per la verifica del Codice Fiscale[cite: 1]
 def estrai_consonanti_vocali(testo):
     testo = testo.upper()
     consonanti = "".join([c for c in testo if c.isalpha() and c not in "AEIOU"])
@@ -281,7 +281,7 @@ def calcola_iniziali_cf(cognome, nome):
     return cognome_cf, nome_cf
 
 
-# Tabelle ufficiali per il calcolo del carattere di controllo del Codice Fiscale
+# Tabelle ufficiali per il calcolo del carattere di controllo del Codice Fiscale[cite: 1]
 _VALORI_DISPARI = {
     "0": 1, "1": 0, "2": 5, "3": 7, "4": 9, "5": 13, "6": 15, "7": 17, "8": 19, "9": 21,
     "A": 1, "B": 0, "C": 5, "D": 7, "E": 9, "F": 13, "G": 15, "H": 17, "I": 19, "J": 21,
@@ -327,7 +327,7 @@ def valida_codice_fiscale(nome, cognome, cf):
     return True, ""
 
 
-# --- Funzioni di supporto per Account Utenti (Registrazione/Login/Recupero) ---
+# --- Funzioni di supporto per Account Utenti (Registrazione/Login/Recupero) ---[cite: 1]
 def hash_password(password, salt=None):
     if salt is None:
         salt = secrets.token_hex(16)
@@ -531,7 +531,7 @@ for possible_name in [
         break
 
 
-# --- BARRA LATERALE (Admin & Logo) ---
+# --- BARRA LATERALE (Admin & Logo) ---[cite: 1]
 if logo_path:
     st.sidebar.image(logo_path, use_container_width=True)
 
@@ -559,7 +559,7 @@ if st.session_state["admin_logged_in"]:
         st.rerun()
 
 
-# --- VISTA 1: PANNELLO AMMINISTRATORE ---
+# --- VISTA 1: PANNELLO AMMINISTRATORE ---[cite: 1]
 if st.session_state["admin_logged_in"]:
     st.title("📊 Gestione Appuntamenti & Studio (Admin)")
 
@@ -946,7 +946,7 @@ if st.session_state["admin_logged_in"]:
             st.info("Nessun account cliente registrato al momento.")
 
 
-# --- VISTA 2: PAGINA PRINCIPALE CLIENTE ---
+# --- VISTA 2: PAGINA PRINCIPALE CLIENTE ---[cite: 1]
 else:
     client_device_id = get_client_device_id()
     
@@ -1168,7 +1168,7 @@ else:
 
             st.stop()
 
-        # --- GATE DI ACCESSO: Login / Registrazione Account Cliente ---
+        # --- GATE DI ACCESSO: Login / Registrazione Account Cliente ---[cite: 1]
         if "utente_loggato" not in st.session_state:
             if logo_path:
                 c1, c2, c3 = st.columns([1, 2, 1])
@@ -1271,7 +1271,13 @@ else:
                                 reg_nome, reg_cognome, reg_cf, reg_password
                             )
                             if successo:
-                                st.success(msg)
+                                # LOGIN AUTOMATICO: Effettua il login e reindirizza subito alla schermata principale
+                                utente_creato, _ = login_utente(reg_nome, reg_cognome, reg_password)
+                                if utente_creato:
+                                    st.session_state["utente_loggato"] = utente_creato
+                                    st.rerun()
+                                else:
+                                    st.success(msg)
                             else:
                                 st.error(f"❌ {msg}")
 
@@ -1335,7 +1341,7 @@ else:
             st.session_state["regolamento_accettato"] = False
             st.rerun()
 
-        # TAB 1: PRENOTAZIONE
+        # TAB 1: PRENOTAZIONE[cite: 1]
         with tab1:
             st.markdown("### Modulo di Prenotazione")
 
@@ -1609,7 +1615,7 @@ else:
                             st.session_state["mostra_dialog_regolamento"] = True
                             st.rerun()
 
-        # TAB 2: INFO STUDIO (Include Info + Dove Siamo)
+        # TAB 2: INFO STUDIO (Include Info + Dove Siamo)[cite: 1]
         with tab2:
             st.markdown("### ℹ️ Informazioni sullo Studio")
             st.markdown(
@@ -1643,7 +1649,7 @@ else:
                 * **🤖 Android (Chrome):** Tocca i tre puntini in alto a destra nel browser e seleziona **"Aggiungi a schermata Home"** o **"Installa app"**.
                 """)
 
-        # TAB 3: REGOLAMENTO
+        # TAB 3: REGOLAMENTO[cite: 1]
         with tab3:
             st.markdown("### 📜 Regolamento dello Studio")
             st.markdown("""
@@ -1655,7 +1661,7 @@ else:
                 * ⏱️ **Disdette:** Preavviso minimo di 24 ore, in contrario la lezione verrà comunque conteggiata.
                 """)
 
-        # --- Footer: pulsante di logout, in basso a sinistra ---
+        # --- Footer: pulsante di logout, in basso a sinistra ---[cite: 1]
         st.markdown("<br>", unsafe_allow_html=True)
         col_footer_1, col_footer_2 = st.columns([1, 3])
         with col_footer_1:
