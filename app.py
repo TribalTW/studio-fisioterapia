@@ -11,14 +11,14 @@ import streamlit as st
 import streamlit.components.v1 as components
 from sqlalchemy import create_engine, text
 
-# Configurazione Pagina[cite: 1]
+# Configurazione Pagina
 st.set_page_config(
-    page_title="Postura & Pilates - Dott.ssa Roberta Sinagra",
-    page_icon="🧘‍♀️",
+    page_title="Lola's Glam House",
+    page_icon="💅",
     layout="centered",
 )
 
-# Connessione a Supabase / PostgreSQL con caching delle risorse[cite: 1]
+# Connessione a Supabase / PostgreSQL con caching delle risorse
 @st.cache_resource
 def get_db_engine():
     db_url = st.secrets["supabase"]["db_url"]
@@ -26,7 +26,7 @@ def get_db_engine():
 
 engine = get_db_engine()
 
-# Inizializzazione Database PostgreSQL / Supabase (Eseguita una sola volta)[cite: 1]
+# Inizializzazione Database PostgreSQL / Supabase (Eseguita una sola volta)
 @st.cache_resource
 def init_db():
     with engine.begin() as conn:
@@ -76,28 +76,28 @@ def init_db():
 
 init_db()
 
-# Stile CSS professionale e raffinato con tema rosa pastello (#fca4c3), ombreggiature e animazioni[cite: 1]
+# Stile CSS professionale basato sul colore #f2b3ff, ombreggiature e animazioni coordinate
 st.markdown(
     """
     <style>
-    /* Sfondo generale pulito */
+    /* Sfondo generale pulito basato su #f2b3ff */
     .stApp {
-        background-color: #fff9fb;
+        background-color: #fdf5ff;
         font-family: 'Inter', sans-serif;
     }
 
     /* Container professionali con bordi arrotondati, sfumatura delicata e ombreggiature con animazione */
     div.stVerticalBlockBorderWrapper, div[data-testid="stVerticalBlockBorderWrapper"] {
-        background: linear-gradient(135deg, #ffffff 0%, #fff5f8 100%) !important;
-        border: 1px solid #f9d1df !important;
+        background: linear-gradient(135deg, #ffffff 0%, #fcf0ff 100%) !important;
+        border: 1px solid #f2b3ff !important;
         border-radius: 20px !important;
         padding: 24px !important;
-        box-shadow: 0 10px 30px rgba(252, 164, 195, 0.15) !important;
+        box-shadow: 0 10px 30px rgba(242, 179, 255, 0.2) !important;
         transition: all 0.3s ease-in-out !important;
     }
     
     div[data-testid="stVerticalBlockBorderWrapper"]:hover {
-        box-shadow: 0 15px 35px rgba(252, 164, 195, 0.25) !important;
+        box-shadow: 0 15px 35px rgba(242, 179, 255, 0.35) !important;
         transform: translateY(-2px);
     }
     
@@ -109,19 +109,19 @@ st.markdown(
     .stTextInput input, .stSelectbox > div > div, .stDateInput input, .stNumberInput input {
         background-color: #FFFFFF !important;
         border-radius: 10px !important;
-        border: 1.5px solid #f2c2d5 !important;
+        border: 1.5px solid #e0a3ff !important;
         padding: 10px 14px !important;
         transition: all 0.2s ease-in-out !important;
     }
 
     .stTextInput input:focus, .stSelectbox > div > div:focus, .stDateInput input:focus, .stNumberInput input:focus {
-        border-color: #D81B60 !important;
-        box-shadow: 0 0 0 3px rgba(216, 27, 96, 0.15) !important;
+        border-color: #7b1fa2 !important;
+        box-shadow: 0 0 0 3px rgba(123, 31, 162, 0.15) !important;
     }
     
-    /* Pulsanti professionali (inclusi i pulsanti dei form come Accedi) con effetti di transizione e ombreggiatura */
+    /* Pulsanti professionali con effetti di transizione e ombreggiatura */
     div.stButton > button, div.stDownloadButton > button, div.stFormSubmitButton > button {
-        background: linear-gradient(135deg, #D81B60 0%, #AD1457 100%) !important;
+        background: linear-gradient(135deg, #7b1fa2 0%, #4a148c 100%) !important;
         color: white !important;
         border-radius: 12px !important;
         font-size: 1.05rem !important;
@@ -132,35 +132,35 @@ st.markdown(
         margin-top: 8px !important;
         text-align: center !important;
         display: block !important;
-        box-shadow: 0 4px 15px rgba(216, 27, 96, 0.3) !important;
+        box-shadow: 0 4px 15px rgba(123, 31, 162, 0.3) !important;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
         cursor: pointer;
     }
     
     div.stButton > button:hover, div.stDownloadButton > button:hover, div.stFormSubmitButton > button:hover {
-        background: linear-gradient(135deg, #C2185B 0%, #880E4F 100%) !important;
+        background: linear-gradient(135deg, #6a1b9a 0%, #38006b 100%) !important;
         color: white !important;
-        box-shadow: 0 6px 20px rgba(216, 27, 96, 0.45) !important;
+        box-shadow: 0 6px 20px rgba(123, 31, 162, 0.45) !important;
         transform: translateY(-2px);
     }
 
     div.stButton > button:active, div.stFormSubmitButton > button:active {
         transform: translateY(0px);
-        box-shadow: 0 2px 10px rgba(216, 27, 96, 0.3) !important;
+        box-shadow: 0 2px 10px rgba(123, 31, 162, 0.3) !important;
     }
 
-    /* Stile specifico per il pulsante secondario (Password dimenticata?) nella seconda colonna del form di login */
+    /* Stile specifico per il pulsante secondario (Password dimenticata?) nella seconda colonna */
     div[data-testid="stColumn"]:nth-child(2) div.stFormSubmitButton > button {
-        background: #fff0f5 !important;
-        color: #880E4F !important;
-        border: 1.5px solid #fca4c3 !important;
-        box-shadow: 0 4px 15px rgba(252, 164, 195, 0.15) !important;
+        background: #fcf0ff !important;
+        color: #4a148c !important;
+        border: 1.5px solid #f2b3ff !important;
+        box-shadow: 0 4px 15px rgba(242, 179, 255, 0.2) !important;
     }
 
     div[data-testid="stColumn"]:nth-child(2) div.stFormSubmitButton > button:hover {
-        background: #ffe4ec !important;
-        color: #880E4F !important;
-        box-shadow: 0 6px 20px rgba(252, 164, 195, 0.3) !important;
+        background: #f8e1ff !important;
+        color: #4a148c !important;
+        box-shadow: 0 6px 20px rgba(242, 179, 255, 0.35) !important;
         transform: translateY(-2px);
     }
     
@@ -173,23 +173,23 @@ st.markdown(
     
     /* Tipografia e Titoli */
     h1, h2, h3, h4 {
-        color: #880E4F !important;
+        color: #4a148c !important;
         font-weight: 700 !important;
         letter-spacing: -0.5px;
         text-align: center;
     }
     
-    /* Box informativo in stile pastello (#fca4c3) */
+    /* Box informativo in stile pastello con #f2b3ff */
     .box-info-carino {
-        background: linear-gradient(135deg, #fff0f5 0%, #ffe4ec) !important;
-        border: 1px solid #fca4c3 !important;
+        background: linear-gradient(135deg, #fcf0ff 0%, #f8e1ff) !important;
+        border: 1px solid #f2b3ff !important;
         border-radius: 14px !important;
         padding: 16px 20px !important;
         margin-bottom: 20px !important;
         text-align: center !important;
-        color: #880E4F !important;
+        color: #4a148c !important;
         font-size: 0.98rem !important;
-        box-shadow: 0 4px 15px rgba(252, 164, 195, 0.15) !important;
+        box-shadow: 0 4px 15px rgba(242, 179, 255, 0.2) !important;
     }
     
     /* Stile delle Tab di navigazione - Uniforme e a capsula */
@@ -209,30 +209,30 @@ st.markdown(
     }
 
     .stTabs [data-baseweb="tab"] {
-        background-color: #fff0f5;
+        background-color: #fcf0ff;
         border-radius: 40px !important;
-        color: #880E4F;
+        color: #4a148c;
         font-weight: 600;
         padding: 10px 24px !important;
         text-align: center !important;
         font-size: 15px !important;
-        border: 1.5px solid #fca4c3 !important;
+        border: 1.5px solid #f2b3ff !important;
         transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
         flex: 1 1 auto !important;
     }
 
     .stTabs [data-baseweb="tab"]:hover {
-        background-color: #ffe4ec;
+        background-color: #f8e1ff;
         transform: translateY(-2px);
     }
 
     .stTabs [aria-selected="true"] {
-        background: linear-gradient(135deg, #fca4c3 0%, #e882a4) !important;
+        background: linear-gradient(135deg, #f2b3ff 0%, #d880ff) !important;
         color: #ffffff !important;
-        border-color: #e882a4 !important;
+        border-color: #d880ff !important;
         border-radius: 40px !important;
         padding: 10px 24px !important;
-        box-shadow: 0 12px 30px rgba(232, 130, 164, 0.55) !important;
+        box-shadow: 0 12px 30px rgba(216, 128, 255, 0.55) !important;
         transform: translateY(-4px) scale(1.03) !important;
         z-index: 999 !important;
     }
@@ -260,7 +260,7 @@ st.markdown(
 )
 
 
-# Funzioni di supporto per la verifica del Codice Fiscale[cite: 1]
+# Funzioni di supporto per la verifica del Codice Fiscale
 def estrai_consonanti_vocali(testo):
     testo = testo.upper()
     consonanti = "".join([c for c in testo if c.isalpha() and c not in "AEIOU"])
@@ -281,7 +281,7 @@ def calcola_iniziali_cf(cognome, nome):
     return cognome_cf, nome_cf
 
 
-# Tabelle ufficiali per il calcolo del carattere di controllo del Codice Fiscale[cite: 1]
+# Tabelle ufficiali per il calcolo del carattere di controllo del Codice Fiscale
 _VALORI_DISPARI = {
     "0": 1, "1": 0, "2": 5, "3": 7, "4": 9, "5": 13, "6": 15, "7": 17, "8": 19, "9": 21,
     "A": 1, "B": 0, "C": 5, "D": 7, "E": 9, "F": 13, "G": 15, "H": 17, "I": 19, "J": 21,
@@ -327,7 +327,7 @@ def valida_codice_fiscale(nome, cognome, cf):
     return True, ""
 
 
-# --- Funzioni di supporto per Account Utenti (Registrazione/Login/Recupero) ---[cite: 1]
+# --- Funzioni di supporto per Account Utenti (Registrazione/Login/Recupero) ---
 def hash_password(password, salt=None):
     if salt is None:
         salt = secrets.token_hex(16)
@@ -441,14 +441,14 @@ def get_orari_per_data(data):
     else:
         d = data
     weekday = d.weekday()
-    if weekday == 5:
-        return ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00"]
-    elif weekday == 6:
+    if weekday == 5: # Sabato
+        return ["09:00", "10:00", "11:00", "12:00", "15:00", "16:00", "17:00"]
+    elif weekday == 6: # Domenica chiuso
         return []
-    else:
+    else: # Lunedì - Venerdì
         return [
-            "08:00", "09:00", "10:00", "11:00", "12:00", "13:00",
-            "14:00", "15:00", "16:00", "17:00", "18:00", "19:00",
+            "09:00", "10:00", "11:00", "12:00",
+            "15:00", "16:00", "17:00", "18:00", "19:00",
         ]
 
 
@@ -478,41 +478,40 @@ def genera_file_ics(nome_trattamento, data_str, ora_str):
     dt_fine = dt_inizio + timedelta(minutes=50)
     
     fmt = "%Y%m%dT%H%M00"
-    titolo_evento = f"Pilates: {nome_trattamento} - Dott.ssa Roberta Sinagra"
+    titolo_evento = f"Lola's Glam House: {nome_trattamento}"
     
     ics_content = f"""BEGIN:VCALENDAR
 VERSION:2.0
-PRODID:-//Postura e Pilates//Dott.ssa Roberta Sinagra//IT
+PRODID:-//Lolas Glam House//Estetica//IT
 CALSCALE:GREGORIAN
 METHOD:PUBLISH
 BEGIN:VEVENT
 SUMMARY:{titolo_evento}
-DESCRIPTION:Appuntamento di Postura & Pilates con la Dott.ssa Roberta Sinagra.\\nRicorda di portare i calzini antiscivolo e un asciugamano personale.
-LOCATION:Studio Dott.ssa Roberta Sinagra
+DESCRIPTION:Appuntamento presso Lola's Glam House.\\nTi ricordiamo di arrivare puntuale per il tuo trattamento.
+LOCATION:Lola's Glam House
 DTSTART:{dt_inizio.strftime(fmt)}
 DTEND:{dt_fine.strftime(fmt)}
 BEGIN:VALARM
 TRIGGER:-PT60M
 ACTION:DISPLAY
-DESCRIPTION:Promemoria: Tra 1 ora hai la lezione di Pilates in studio!
+DESCRIPTION:Promemoria: Tra 1 ora hai il tuo appuntamento da Lola's Glam House!
 END:VALARM
 END:VEVENT
 END:VCALENDAR"""
     return ics_content
 
 
-@st.dialog("📜 Regolamento dello Studio - Termini di Servizio")
+@st.dialog("📜 Regolamento del Salone - Termini di Servizio")
 def popup_regolamento():
     st.markdown(
         """
-        Prima di completare la prenotazione, ti invitiamo a leggere attentamente il regolamento dello studio:
+        Prima di completare la prenotazione, ti invitiamo a leggere attentamente il regolamento di Lola's Glam House:
         
-        * ⏱️ **Durata Lezione:** La lezione dura 50 minuti.
-        * 🕒 **Puntualità:** Si raccomanda di presentarsi circa 5 minuti prima dell'orario della seduta.
-        * 🧦 **Abbigliamento e Calzini:** È obbligatorio l'uso di **calzini antiscivolo** durante tutte le lezioni.
-        * 🧴 **Asciugamano:** Si richiede di portare un proprio asciugamano personale.
-        * 📵 **Cellulari:** Modalità silenziosa consigliata.
-        * ⏱️ **Disdette:** Preavviso minimo di 24 ore, in caso contrario la lezione verrà comunque conteggiata.
+        * ⏱️ **Durata Trattamento:** Varia in base al servizio scelto.
+        * 🕒 **Puntualità:** Si raccomanda la massima puntualità.
+        * 🧴 **Cura di sé:** Vi invitiamo a segnalare eventuali allergie, sensibilità o condizioni particolari prima dell'inizio.
+        * 📵 **Cellulari:** Modalità silenziosa consigliata per godersi il relax.
+        * ⏱️ **Disdette:** Preavviso minimo di 24 ore, in caso contrario l'appuntamento potrebbe essere conteggiato.
         """
     )
     st.markdown("---")
@@ -531,7 +530,7 @@ for possible_name in [
         break
 
 
-# --- BARRA LATERALE (Admin & Logo) ---[cite: 1]
+# --- BARRA LATERALE (Admin & Logo) ---
 if logo_path:
     st.sidebar.image(logo_path, use_container_width=True)
 
@@ -559,9 +558,9 @@ if st.session_state["admin_logged_in"]:
         st.rerun()
 
 
-# --- VISTA 1: PANNELLO AMMINISTRATORE ---[cite: 1]
+# --- VISTA 1: PANNELLO AMMINISTRATORE ---
 if st.session_state["admin_logged_in"]:
-    st.title("📊 Gestione Appuntamenti & Studio (Admin)")
+    st.title("📊 Gestione Appuntamenti & Salone (Admin)")
 
     if st.button("🔄 Aggiorna Dati", key="btn_aggiorna_dati"):
         st.rerun()
@@ -630,7 +629,7 @@ if st.session_state["admin_logged_in"]:
                         if is_presente:
                             codice_seduta = f"SEDUTA-OK-{app_id}-{data_presenze_str}"
                             st.markdown(
-                                f"<code style='color: #D81B60; font-weight: bold;'>{codice_seduta}</code>",
+                                f"<code style='color: #7b1fa2; font-weight: bold;'>{codice_seduta}</code>",
                                 unsafe_allow_html=True,
                             )
                         else:
@@ -657,18 +656,18 @@ if st.session_state["admin_logged_in"]:
             st.info("Nessun appuntamento cliente registrato per la data selezionata.")
 
         st.markdown("---")
-        st.markdown("#### 📈 Riepilogo e Calcolo Totale Sedute (Gestionale)")
-        if st.button("📊 Calcola Statistiche e Sedute Svolte per Cliente"):
+        st.markdown("#### 📈 Riepilogo e Calcolo Totale Trattamenti (Gestionale)")
+        if st.button("📊 Calcola Statistiche e Trattamenti Svolti per Cliente"):
             df_stat = pd.read_sql_query(
                 """
                 SELECT nome, 
-                       COUNT(CASE WHEN stato_presenza = 'Presente' THEN 1 END) AS sedute_effettuate,
-                       COUNT(CASE WHEN stato_presenza = 'Assente' THEN 1 END) AS sedute_assenze,
+                       COUNT(CASE WHEN stato_presenza = 'Presente' THEN 1 END) AS trattamenti_effettuati,
+                       COUNT(CASE WHEN stato_presenza = 'Assente' THEN 1 END) AS trattamenti_assenze,
                        COUNT(*) AS totale_prenotazioni
                 FROM prenotazioni 
                 WHERE device_id != 'SYSTEM'
                 GROUP BY nome
-                ORDER BY sedute_effettuate DESC
+                ORDER BY trattamenti_effettuati DESC
             """,
                 engine,
             )
@@ -679,18 +678,18 @@ if st.session_state["admin_logged_in"]:
                 st.info("Nastro dati insufficiente per le statistiche.")
 
     with st.container(border=True):
-        st.subheader("📷 QR Code Check-in Ingresso Studio")
+        st.subheader("📷 QR Code Check-in Ingresso Salone")
         st.write(
-            "Mostra o stampa questo QR code da posizionare all'ingresso dello studio. "
-            "Quando arrivo il cliente potrà inquadrarlo per registrare la presenza."
+            "Mostra o stampa questo QR code da posizionare all'ingresso del salone. "
+            "Quando arriva la cliente potrà inquadrarlo per registrare la presenza."
         )
 
         components.html(
             """
-        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; background: #ffffff; padding: 20px; border-radius: 12px; border: 2px dashed #D81B60;">
-            <h4 style="color: #880E4F; margin-bottom: 10px;">Inquadra per Check-in Studio 🧘‍♀️</h4>
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; background: #ffffff; padding: 20px; border-radius: 12px; border: 2px dashed #7b1fa2;">
+            <h4 style="color: #4a148c; margin-bottom: 10px;">Inquadra per Check-in in Salone 💅</h4>
             <div id="qrcode" style="margin: 15px;"></div>
-            <p style="font-size: 12px; color: #555; text-align: center;">Inquadra con la fotocamera dello smartphone all'arrivo in studio.</p>
+            <p style="font-size: 12px; color: #555; text-align: center;">Inquadra con la fotocamera dello smartphone all'arrivo in salone.</p>
         </div>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
         <script>
@@ -712,7 +711,7 @@ if st.session_state["admin_logged_in"]:
         )
 
     with st.container(border=True):
-        st.subheader("🔓 Gestione Chiusure e Sblocchi Studio")
+        st.subheader("🔓 Gestione Chiusure e Sblocchi Salone")
         st.write("Seleziona un giorno o un intervallo e gestisci la disponibilità.")
 
         col_bs1, col_bs2 = st.columns(2)
@@ -732,8 +731,8 @@ if st.session_state["admin_logged_in"]:
 
         ora_intervallo = None
         TUTTI_GLI_ORARI_ADMIN = [
-            "08:00", "09:00", "10:00", "11:00", "12:00", "13:00",
-            "14:00", "15:00", "16:00", "17:00", "18:00", "19:00",
+            "09:00", "10:00", "11:00", "12:00",
+            "15:00", "16:00", "17:00", "18:00", "19:00",
         ]
         if modo_intervallo == "Orario specifico":
             ora_intervallo = st.selectbox(
@@ -775,7 +774,7 @@ if st.session_state["admin_logged_in"]:
                                     conn.execute(
                                         text("INSERT INTO prenotazioni (nome, data, ora, trattamento, data_creazione, device_id, stato_presenza) VALUES (:n, :d, :o, :t, :dc, :di, :sp)"),
                                         {
-                                            "n": "🔒 STUDIO CHIUSO", "d": d_str, "o": h,
+                                            "n": "🔒 SALONE CHIUSO", "d": d_str, "o": h,
                                             "t": "Chiusura Admin", "dc": ora_attuale_str,
                                             "di": "SYSTEM", "sp": "Chiuso"
                                         }
@@ -899,7 +898,7 @@ if st.session_state["admin_logged_in"]:
     with st.container(border=True):
         st.subheader("👤 Gestione Account Registrati")
         st.write(
-            "Qui trovi tutti gli account creati dai clienti (Nome, Cognome, Codice Fiscale). "
+            "Qui trovi tutti gli account creati dalle clienti (Nome, Cognome, Codice Fiscale). "
             "Puoi eliminarne uno se richiesto."
         )
 
@@ -946,7 +945,7 @@ if st.session_state["admin_logged_in"]:
             st.info("Nessun account cliente registrato al momento.")
 
 
-# --- VISTA 2: PAGINA PRINCIPALE CLIENTE ---[cite: 1]
+# --- VISTA 2: PAGINA PRINCIPALE CLIENTE ---
 else:
     client_device_id = get_client_device_id()
     
@@ -969,7 +968,7 @@ else:
                 with c2:
                     st.image(logo_path, use_container_width=True)
 
-            st.title("📍 Check-in Ingresso Studio")
+            st.title("📍 Check-in Ingresso Salone")
             
             current_dt = get_current_time_local()
             oggi_str = current_dt.strftime("%Y-%m-%d")
@@ -981,15 +980,15 @@ else:
                 ]
                 st.balloons()
                 with st.container(border=True):
-                    st.markdown(f"### Ciao {p_nome}! 🧘‍♀️")
+                    st.markdown(f"### Ciao {p_nome}! 💅")
                     st.success("🎉 **Presenza registrata con successo!**")
                     st.write(
-                        f"Ho registrato il tuo arrivo per la lezione di **{p_tratt}** delle ore **{p_ora}**."
+                        f"Ho registrato il tuo arrivo per il trattamento di **{p_tratt}** delle ore **{p_ora}**."
                     )
                     st.markdown("---")
                     st.markdown(f"**Il tuo Codice Seduta:**")
                     st.markdown(
-                        f"<h3 style='color: #D81B60; text-align: center;'>`SEDUTA-OK-{p_id}-{oggi_str}`</h3>",
+                        f"<h3 style='color: #7b1fa2; text-align: center;'>`SEDUTA-OK-{p_id}-{oggi_str}`</h3>",
                         unsafe_allow_html=True,
                     )
             else:
@@ -997,8 +996,8 @@ else:
                     utente_già_loggato = st.session_state.get("utente_loggato", None)
 
                     if utente_già_loggato:
-                        st.markdown(f"**Benvenuto/a, {utente_già_loggato['nome']} {utente_già_loggato['cognome']}! 🧘‍♀️**")
-                        st.write("Clicca sul pulsante sottostante per confermare il tuo arrivo in studio.")
+                        st.markdown(f"**Benvenuta, {utente_già_loggato['nome']} {utente_già_loggato['cognome']}! 💅**")
+                        st.write("Clicca sul pulsante sottostante per confermare il tuo arrivo in salone.")
                         
                         with st.form("form_checkin_veloce"):
                             submit_checkin_veloce = st.form_submit_button("✅ Conferma la mia Presenza")
@@ -1070,7 +1069,7 @@ else:
                                         )
                     else:
                         st.markdown(
-                            "**Benvenuto/a in studio! 🧘‍♀️ Inserisci i dati del tuo account per confermare l'arrivo:**"
+                            "**Benvenuta in salone! 💅 Inserisci i dati del tuo account per confermare l'arrivo:**"
                         )
                         with st.form("form_checkin_cliente_automatico"):
                             chk_nome = st.text_input("Nome *")
@@ -1168,20 +1167,20 @@ else:
 
             st.stop()
 
-        # --- GATE DI ACCESSO: Login / Registrazione Account Cliente ---[cite: 1]
+        # --- GATE DI ACCESSO: Login / Registrazione Account Cliente ---
         if "utente_loggato" not in st.session_state:
             if logo_path:
                 c1, c2, c3 = st.columns([1, 2, 1])
                 with c2:
                     st.image(logo_path, use_container_width=True)
 
-            st.title("Postura & Pilates")
-            st.write("**Dott.ssa Roberta Sinagra**")
+            st.title("Lola's Glam House")
+            st.write("**Estetica & Benessere**")
             st.markdown("#### 👤 Accedi al tuo account o registrati")
             st.markdown(
                 """
                 <div class="box-info-carino">
-                    ✨ Accedi o Registrati per poter prenotare la tua prossima lezione con pochi semplici click.
+                    ✨ Accedi o Registrati per poter prenotare il tuo prossimo trattamento con pochi semplici click.
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -1191,7 +1190,7 @@ else:
 
             with tab_login:
                 if st.session_state.get("vista_recupero", False):
-                    st.markdown("<h5 style='text-align: center; color: #880E4F;'>🔑 Reimposta Password</h5>", unsafe_allow_html=True)
+                    st.markdown("<h5 style='text-align: center; color: #4a148c;'>🔑 Reimposta Password</h5>", unsafe_allow_html=True)
                     st.write("Inserisci Nome, Cognome, Codice Fiscale e la nuova password.")
                     with st.form("form_recupero_password"):
                         rec_nome = st.text_input("Nome *", key="rec_nome_input")
@@ -1271,13 +1270,7 @@ else:
                                 reg_nome, reg_cognome, reg_cf, reg_password
                             )
                             if successo:
-                                # LOGIN AUTOMATICO: Effettua il login e reindirizza subito alla schermata principale
-                                utente_creato, _ = login_utente(reg_nome, reg_cognome, reg_password)
-                                if utente_creato:
-                                    st.session_state["utente_loggato"] = utente_creato
-                                    st.rerun()
-                                else:
-                                    st.success(msg)
+                                st.success(msg)
                             else:
                                 st.error(f"❌ {msg}")
 
@@ -1288,11 +1281,11 @@ else:
             with c2:
                 st.image(logo_path, use_container_width=True)
 
-        st.title("Postura & Pilates")
+        st.title("Lola's Glam House")
         st.markdown(
             f"""
             <p style="text-align: center;">
-                <strong>Dott.ssa Roberta Sinagra</strong> &nbsp;|&nbsp; Ciao,
+                <strong>Estetica & Benessere</strong> &nbsp;|&nbsp; Ciao,
                 {st.session_state['utente_loggato']['nome']} 👋
             </p>
             """,
@@ -1301,7 +1294,7 @@ else:
 
         tab1, tab2, tab3 = st.tabs([
             "📅 Prenota",
-            "ℹ️ Info Studio",
+            "ℹ️ Info Salone",
             "📜 Regolamento",
         ])
 
@@ -1332,7 +1325,7 @@ else:
             data_formattata = pb["data_scelta"].strftime("%d/%m/%Y")
             
             st.session_state["booking_success_msg"] = (
-                f"🎉 PRENOTAZIONE CONFERMATA!\n\nGrazie {pb['nome']} {pb['cognome']}, ti aspetto il {data_formattata} alle ore {pb['ora_scelta']} per {pb['trattamento']}."
+                f"🎉 PRENOTAZIONE CONFERMATA!\n\nGrazie {pb['nome']} {pb['cognome']}, ti aspettiamo il {data_formattata} alle ore {pb['ora_scelta']} per il trattamento: {pb['trattamento']}."
             )
             st.session_state["ics_data"] = ics_string
             st.session_state["reset_form_flag"] = True
@@ -1341,7 +1334,7 @@ else:
             st.session_state["regolamento_accettato"] = False
             st.rerun()
 
-        # TAB 1: PRENOTAZIONE[cite: 1]
+        # TAB 1: PRENOTAZIONE
         with tab1:
             st.markdown("### Modulo di Prenotazione")
 
@@ -1361,8 +1354,8 @@ else:
                     st.markdown("---")
                     st.markdown(
                         """
-                        <div style="background-color: #fff0f5; padding: 22px; border-radius: 14px; border: 2px solid #D81B60; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-                            <h3 style="color: #880E4F; margin-top: 0; font-size: 1.35rem;">📲 SALVA L'APPUNTAMENTO NEL TUO CALENDARIO</h3>
+                        <div style="background-color: #fcf0ff; padding: 22px; border-radius: 14px; border: 2px solid #7b1fa2; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                            <h3 style="color: #4a148c; margin-top: 0; font-size: 1.35rem;">📲 SALVA L'APPUNTAMENTO NEL TUO CALENDARIO</h3>
                             <p style="font-size: 1.05rem; color: #333; margin-bottom: 15px; line-height: 1.5;">
                                 Clicca sul pulsante qui sotto per scaricare il file dell'evento. Bastano pochissimi secondi per salvarlo sul tuo telefono o computer!
                             </p>
@@ -1374,7 +1367,7 @@ else:
                     st.download_button(
                         label="📅 Scarica e Salva in Calendario (.ics)",
                         data=st.session_state["ics_data"],
-                        file_name="appuntamento_pilates.ics",
+                        file_name="appuntamento_lolas_glam_house.ics",
                         mime="text/calendar",
                         use_container_width=True
                     )
@@ -1406,12 +1399,15 @@ else:
                     )
 
                     trattamento = st.selectbox(
-                        "Seleziona Trattamento / Lezione *",
+                        "Seleziona Trattamento Estetico *",
                         [
-                            "Valutazione Posturale",
-                            "Lezione Pilates Individuale",
-                            "Pilates Duetto (in coppia)",
-                            "Rieducazione Posturale Motorìa",
+                            "Manicure Semipermanente",
+                            "Pedicure Estetico",
+                            "Pulizia Viso Profonda",
+                            "Laminazione Ciglia e Sopracciglia",
+                            "Trattamento Viso Anti-age",
+                            "Massaggio Corpo Relax",
+                            "Trattamento di Coppia",
                         ],
                         key="trattamento_input",
                     )
@@ -1419,7 +1415,7 @@ else:
                     nome_2 = ""
                     cognome_2 = ""
                     codice_fiscale_2 = ""
-                    if trattamento == "Pilates Duetto (in coppia)":
+                    if trattamento == "Trattamento di Coppia":
                         st.markdown("---")
                         st.markdown("##### 👥 Dati Seconda Persona (Coppia)")
                         col_n4, col_n5, col_n6 = st.columns([2, 2, 3])
@@ -1460,7 +1456,7 @@ else:
                         for p_ora, p_trattamento, p_cf1, p_cf2, p_dev in prenotazioni_giorno:
                             if p_ora == h:
                                 if (
-                                    p_trattamento in ("Chiusura Admin", "🔒 STUDIO CHIUSO")
+                                    p_trattamento in ("Chiusura Admin", "🔒 SALONE CHIUSO")
                                     or "CHIUSO" in p_trattamento
                                 ):
                                     slot_bloccato = True
@@ -1473,7 +1469,7 @@ else:
                                 if cf_curr_2 and (p_cf1 == cf_curr_2 or p_cf2 == cf_curr_2):
                                     utente_gia_prenotato = True
 
-                                if p_trattamento == "Pilates Duetto (in coppia)":
+                                if p_trattamento == "Trattamento di Coppia":
                                     posti_occupati += 2
                                 else:
                                     posti_occupati += 1
@@ -1481,7 +1477,7 @@ else:
                         if slot_bloccato or utente_gia_prenotato:
                             continue
 
-                        if trattamento == "Pilates Duetto (in coppia)":
+                        if trattamento == "Trattamento di Coppia":
                             if posti_occupati > 0:
                                 continue
                         else:
@@ -1516,7 +1512,7 @@ else:
                     cognome = cognome.strip().title()
                     codice_fiscale = codice_fiscale.strip().upper()
                     
-                    if trattamento == "Pilates Duetto (in coppia)":
+                    if trattamento == "Trattamento di Coppia":
                         nome_2 = nome_2.strip().title()
                         cognome_2 = cognome_2.strip().title()
                         codice_fiscale_2 = codice_fiscale_2.strip().upper()
@@ -1531,11 +1527,11 @@ else:
                     
                     cf_2_valido = True
                     cf_2_msg = ""
-                    if trattamento == "Pilates Duetto (in coppia)":
+                    if trattamento == "Trattamento di Coppia":
                         cf_2_valido, cf_2_msg = valida_codice_fiscale(nome_2, cognome_2, codice_fiscale_2)
 
                     cf_principale = codice_fiscale.strip().upper()
-                    cf_secondario = codice_fiscale_2.strip().upper() if trattamento == "Pilates Duetto (in coppia)" else None
+                    cf_secondario = codice_fiscale_2.strip().upper() if trattamento == "Trattamento di Coppia" else None
 
                     with engine.begin() as conn_dupl:
                         gia_presente = conn_dupl.execute(
@@ -1556,16 +1552,16 @@ else:
                         st.error("Per favore inserisci nome, cognome e codice fiscale.")
                     elif not cf_valido:
                         st.error(f"❌ **Codice Fiscale non valido per {nome} {cognome}:** {cf_msg}")
-                    elif trattamento == "Pilates Duetto (in coppia)" and (not nome_2.strip() or not cognome_2.strip() or not codice_fiscale_2.strip()):
+                    elif trattamento == "Trattamento di Coppia" and (not nome_2.strip() or not cognome_2.strip() or not codice_fiscale_2.strip()):
                         st.error("Per favore inserisci tutti i dati anche per la seconda persona.")
-                    elif trattamento == "Pilates Duetto (in coppia)" and not cf_2_valido:
+                    elif trattamento == "Trattamento di Coppia" and not cf_2_valido:
                         st.error(f"❌ **Codice Fiscale non valido per la seconda persona ({nome_2} {cognome_2}):** {cf_2_msg}")
                     elif gia_presente:
-                        st.error("⚠️ Hai già una prenotazione attiva in questo giorno e orario (oppure uno dei partecipanti risulta già registrato nello stesso slot).")
+                        st.error("⚠️ Hai già una prenotazione attiva in questo giorno e orario (oppure una delle partecipanti risulta già registrata nello stesso slot).")
                     elif not ora_scelta or "Tutto occupato" in ora_scelta or "Già prenotato" in ora_scelta:
                         st.error("Spiacenti, non ci sono orari disponibili per la data selezionata.")
                     else:
-                        if trattamento == "Pilates Duetto (in coppia)":
+                        if trattamento == "Trattamento di Coppia":
                             nome_completo = f"{nome.strip()} {cognome.strip()} & {nome_2.strip()} {cognome_2.strip()}"
                         else:
                             nome_completo = f"{nome.strip()} {cognome.strip()}"
@@ -1580,12 +1576,12 @@ else:
                         posti_occupati = 0
                         for (p_trattamento,) in esistenti:
                             if (
-                                p_trattamento in ("Chiusura Admin", "🔒 STUDIO CHIUSO")
+                                p_trattamento in ("Chiusura Admin", "🔒 SALONE CHIUSO")
                                 or "CHIUSO" in p_trattamento
                             ):
                                 slot_occupato = True
                                 break
-                            elif p_trattamento == "Pilates Duetto (in coppia)":
+                            elif p_trattamento == "Trattamento di Coppia":
                                 posti_occupati += 2
                             else:
                                 posti_occupati += 1
@@ -1593,9 +1589,9 @@ else:
                         impossibile_prenotare = False
                         if slot_occupato:
                             impossibile_prenotare = True
-                        elif trattamento == "Pilates Duetto (in coppia)" and posti_occupati > 0:
+                        elif trattamento == "Trattamento di Coppia" and posti_occupati > 0:
                             impossibile_prenotare = True
-                        elif trattamento != "Pilates Duetto (in coppia)" and posti_occupati >= 2:
+                        elif trattamento != "Trattamento di Coppia" and posti_occupati >= 2:
                             impossibile_prenotare = True
 
                         if impossibile_prenotare:
@@ -1615,30 +1611,30 @@ else:
                             st.session_state["mostra_dialog_regolamento"] = True
                             st.rerun()
 
-        # TAB 2: INFO STUDIO (Include Info + Dove Siamo)[cite: 1]
+        # TAB 2: INFO SALONE
         with tab2:
-            st.markdown("### ℹ️ Informazioni sullo Studio")
+            st.markdown("### ℹ️ Informazioni su Lola's Glam House")
             st.markdown(
-                "Benvenuto/a nello studio della **Dott.ssa Roberta Sinagra**, specializzato in Posturologia e Pilates."
+                "Benvenuta nel salone di bellezza **Lola's Glam House**, il tuo spazio esclusivo dedicato alla cura, alla bellezza e al benessere di viso e corpo."
             )
-            st.markdown("📍 **Indirizzo:** Inserisci qui l'indirizzo dello studio")
+            st.markdown("📍 **Indirizzo:** Via della Bellezza 12, Città")
             st.markdown(
-                "📞 **Telefono / WhatsApp:** [+39 379 2073118](tel:+393792073118) o [Scrivimi su WhatsApp](https://wa.me/393792073118)"
-            )
-            st.markdown(
-                "📧 **Email:** [posturaepilates@outlook.it](mailto:posturaepilates@outlook.it)"
+                "📞 **Telefono / WhatsApp:** [+39 300 0000000](tel:+39300000000) o [Scrivici su WhatsApp](https://wa.me/39300000000)"
             )
             st.markdown(
-                "📸 Seguimi su [Instagram](https://www.instagram.com/posturaepilates/) per rimanere sempre aggiornato/a su consigli posturali, esercizi e novità dello studio!"
+                "📧 **Email:** [lolasglamhouse@outlook.it](mailto:lolasglamhouse@outlook.it)"
+            )
+            st.markdown(
+                "📸 Seguici su [Instagram](https://www.instagram.com/lolasglamhouse/) per scoprire tutti i nostri lavori, promozioni e novità del salone!"
             )
 
             st.markdown("---")
-            st.markdown("#### 📋 Tipologie di Abbonamenti")
+            st.markdown("#### 📋 Trattamenti & Pacchetti")
             st.markdown("""
-                * 🏷️ **Abbonamento Trimestrale:** 3 mesi, 2 volte a settimana (massimo 3 recuperi)
-                * 🏷️ **Abbonamento Mensile:** 1 mese, 2 volte a settimana (massimo 3 recuperi)
-                * 🏷️ **Carnet 10 Lezioni:** 10 lezioni spendibili nell'arco dei 3 mesi
-                * 🏷️ **Lezione Singola:** Ingresso singolo
+                * 🏷️ **Pacchetto Sposa / Evento:** Trattamenti viso e corpo personalizzati
+                * 🏷️ **Carnet 5 Manicure:** Sconto speciale sui trattamenti unghie
+                * 🏷️ **Promozione Mese:** Sconti dedicati ai trattamenti stagionali
+                * 🏷️ **Servizi Singoli:** Disponibili su prenotazione tramite app
                 """)
 
             st.markdown("---")
@@ -1649,19 +1645,18 @@ else:
                 * **🤖 Android (Chrome):** Tocca i tre puntini in alto a destra nel browser e seleziona **"Aggiungi a schermata Home"** o **"Installa app"**.
                 """)
 
-        # TAB 3: REGOLAMENTO[cite: 1]
+        # TAB 3: REGOLAMENTO
         with tab3:
-            st.markdown("### 📜 Regolamento dello Studio")
+            st.markdown("### 📜 Regolamento del Salone")
             st.markdown("""
-                * ⏱️ **Durata Lezione:** La lezione dura 50 minuti.
-                * 🕒 **Puntualità:** Si raccomanda di presentarsi circa 5 minuti prima dell'orario della seduta.
-                * 🧦 **Abbigliamento e Calzini:** È obbligatorio l'uso di **calzini antiscivolo** durante tutte le lezioni.
-                * 🧴 **Asciugamano:** Si richiede di portare un proprio asciugamano personale.
-                * 📵 **Cellulari:** Modalità silenziosa consigliata.
-                * ⏱️ **Disdette:** Preavviso minimo di 24 ore, in contrario la lezione verrà comunque conteggiata.
+                * ⏱️ **Durata Trattamento:** Varia in base al servizio scelto.
+                * 🕒 **Puntualità:** Si raccomanda la massima puntualità.
+                * 🧴 **Cura di sé:** Vi invitiamo a segnalare eventuali allergie, sensibilità o condizioni particolari prima dell'inizio.
+                * 📵 **Cellulari:** Modalità silenziosa consigliata per godersi il relax.
+                * ⏱️ **Disdette:** Preavviso minimo di 24 ore, in caso contrario l'appuntamento potrebbe essere conteggiato.
                 """)
 
-        # --- Footer: pulsante di logout, in basso a sinistra ---[cite: 1]
+        # --- Footer: pulsante di logout, in basso a sinistra ---
         st.markdown("<br>", unsafe_allow_html=True)
         col_footer_1, col_footer_2 = st.columns([1, 3])
         with col_footer_1:
